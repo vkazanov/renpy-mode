@@ -69,14 +69,17 @@
 
 (defvar renpy-font-lock-keywords
   `(,(rx symbol-start
-	 ;; From v 2.5 reference, ï¿½ keywords.
+	 ;; From v 2.7 reference, § keywords.
 	 ;; def and class dealt with separately below
 	 (or "and" "as" "assert" "break" "continue" "del" "elif" "else"
 	     "except" "exec" "finally" "for" "from" "global" "if"
 	     "import" "in" "is" "lambda" "not" "or" "pass" "print"
 	     "raise" "return" "try" "while" "with" "yield"
-             ;; Not real keywords, but close enough to be fontified as such
-             "self" "True" "False"
+	     ;; Not real keywords, but close enough to be fontified as such
+	     "self" "True" "False"
+	     ;; Python 3
+	     "nonlocal"
+	     ;; Ren'Py
 "$"
 "add"
 "and"
@@ -178,9 +181,9 @@
 "with"
 "yield"
 "zorder"
-             )
+	     )
 	 symbol-end)
-    (,(rx symbol-start "None" symbol-end)	; see ï¿½ Keywords in 2.5 manual
+    (,(rx symbol-start "None" symbol-end)	; see § Keywords in 2.7 manual
      . font-lock-constant-face)
     ;; Definitions
     (,(rx symbol-start (group "class") (1+ space) (group (1+ (or word ?_))))
@@ -194,13 +197,16 @@
     (,(rx symbol-start (group "def") (1+ space) (group (1+ (or word ?_))))
      (1 font-lock-keyword-face) (2 font-lock-function-name-face))
     ;; Top-level assignments are worth highlighting.
-    (,(rx line-start (group (1+ (or word ?_))) (0+ space) "=")
+    (,(rx line-start (group (1+ (or word ?_))) (0+ space)
+	  (opt (or "+" "-" "*" "**" "/" "//" "&" "%" "|" "^" "<<" ">>")) "=")
      (1 font-lock-variable-name-face))
-    (,(rx line-start (* (any " \t")) (group "@" (1+ (or word ?_)))) ; decorators
+    ;; Decorators.
+    (,(rx line-start (* (any " \t")) (group "@" (1+ (or word ?_))
+					    (0+ "." (1+ (or word ?_)))))
      (1 font-lock-type-face))
     ;; Built-ins.  (The next three blocks are from
-    ;; `__builtin__.__dict__.keys()' in Renpy 2.5.1.)  These patterns
-    ;; are debateable, but they at least help to spot possible
+    ;; `__builtin__.__dict__.keys()' in Python 2.7)  These patterns
+    ;; are debatable, but they at least help to spot possible
     ;; shadowing of builtins.
     (,(rx symbol-start (or
 	  ;; exceptions
@@ -217,7 +223,9 @@
 	  "SystemExit" "TabError" "TypeError" "UnboundLocalError"
 	  "UnicodeDecodeError" "UnicodeEncodeError" "UnicodeError"
 	  "UnicodeTranslateError" "UnicodeWarning" "UserWarning"
-	  "ValueError" "Warning" "ZeroDivisionError") symbol-end)
+	  "ValueError" "Warning" "ZeroDivisionError"
+	  ;; Python 2.7
+	  "BufferError" "BytesWarning" "WindowsError") symbol-end)
      . font-lock-type-face)
     (,(rx (or line-start (not (any ". \t"))) (* (any " \t")) symbol-start
 	  (group (or
@@ -235,6 +243,8 @@
 	  "round" "set" "setattr" "slice" "sorted" "staticmethod"
 	  "str" "sum" "super" "tuple" "type" "unichr" "unicode" "vars"
 	  "xrange" "zip"
+	  ;; Python 2.7.
+	  "bin" "bytearray" "bytes" "format" "memoryview" "next" "print"
 "action"
 "activate_align"
 "activate_alignaround"
@@ -1261,37 +1271,29 @@
 "ypos"
 "yzoom"
 "zoom"
-          )) symbol-end)
+	  )) symbol-end)
      (1 font-lock-builtin-face))
     (,(rx symbol-start (or
 	  ;; other built-ins
 	  "True" "False" "None" "Ellipsis"
-	  "_" "__debug__" "__doc__" "__import__" "__name__") symbol-end)
+	  "_" "__debug__" "__doc__" "__import__" "__name__" "__package__")
+	  symbol-end)
      . font-lock-builtin-face)))
 
-(defconst renpy-font-lock-syntactic-keywords
+(defconst renpy-syntax-propertize-function
   ;; Make outer chars of matching triple-quote sequences into generic
   ;; string delimiters.  Fixme: Is there a better way?
   ;; First avoid a sequence preceded by an odd number of backslashes.
-  `((,(rx (not (any ?\\))
-	  ?\\ (* (and ?\\ ?\\))
-	  (group (syntax string-quote))
-	  (backref 1)
-	  (group (backref 1)))
-     (2 ,(string-to-syntax "\"")))	; dummy
-    (,(rx (group (optional (any "uUrR"))) ; prefix gets syntax property
-	  (optional (any "rR"))		  ; possible second prefix
-	  (group (syntax string-quote))   ; maybe gets property
-	  (backref 2)			  ; per first quote
-	  (group (backref 2)))		  ; maybe gets property
-     (1 (renpy-quote-syntax 1))
-     (2 (renpy-quote-syntax 2))
-     (3 (renpy-quote-syntax 3)))
-    ;; This doesn't really help.
-;;;     (,(rx (and ?\\ (group ?\n))) (1 " "))
-    ))
+  (syntax-propertize-rules
+   (;; ¡Backrefs don't work in syntax-propertize-rules!
+    (concat "\\(?:\\([RUru]\\)[Rr]?\\|\\(?:\\=\\|[^\\]\\)\\(?:\\\\.\\)*\\)?" ;Prefix.
+	    "\\(?:\\('\\)'\\('\\)\\|\\(?2:\"\\)\"\\(?3:\"\\)\\)")
+    (3 (ignore (renpy-quote-syntax))))
+   ;; This doesn't really help.
+   ;;((rx (and ?\\ (group ?\n))) (1 " "))
+   ))
 
-(defun renpy-quote-syntax (n)
+(defun renpy-quote-syntax ()
   "Put `syntax-table' property correctly on triple quote.
 Used for syntactic keywords.  N is the match number (1, 2 or 3)."
   ;; Given a triple quote, we have to check the context to know
@@ -1309,28 +1311,25 @@ Used for syntactic keywords.  N is the match number (1, 2 or 3)."
   ;; x '"""' x """ \"""" x
   (save-excursion
     (goto-char (match-beginning 0))
-    (cond
-     ;; Consider property for the last char if in a fenced string.
-     ((= n 3)
-      (let* ((font-lock-syntactic-keywords nil)
-	     (syntax (syntax-ppss)))
-	(when (eq t (nth 3 syntax))	; after unclosed fence
-	  (goto-char (nth 8 syntax))	; fence position
-	  (skip-chars-forward "uUrR")	; skip any prefix
-	  ;; Is it a matching sequence?
-	  (if (eq (char-after) (char-after (match-beginning 2)))
-	      (eval-when-compile (string-to-syntax "|"))))))
-     ;; Consider property for initial char, accounting for prefixes.
-     ((or (and (= n 2)			; leading quote (not prefix)
-	       (= (match-beginning 1) (match-end 1))) ; prefix is null
-	  (and (= n 1)			; prefix
-	       (/= (match-beginning 1) (match-end 1)))) ; non-empty
-      (let ((font-lock-syntactic-keywords nil))
-	(unless (eq 'string (syntax-ppss-context (syntax-ppss)))
-	  (eval-when-compile (string-to-syntax "|")))))
-     ;; Otherwise (we're in a non-matching string) the property is
-     ;; nil, which is OK.
-     )))
+    (let ((syntax (save-match-data (syntax-ppss))))
+      (cond
+       ((eq t (nth 3 syntax))           ; after unclosed fence
+	;; Consider property for the last char if in a fenced string.
+	(goto-char (nth 8 syntax))	; fence position
+	(skip-chars-forward "uUrR")	; skip any prefix
+	;; Is it a matching sequence?
+	(if (eq (char-after) (char-after (match-beginning 2)))
+	    (put-text-property (match-beginning 3) (match-end 3)
+			       'syntax-table (string-to-syntax "|"))))
+       ((match-end 1)
+	;; Consider property for initial char, accounting for prefixes.
+	(put-text-property (match-beginning 1) (match-end 1)
+			   'syntax-table (string-to-syntax "|")))
+       (t
+	;; Consider property for initial char, accounting for prefixes.
+	(put-text-property (match-beginning 2) (match-end 2)
+			   'syntax-table (string-to-syntax "|"))))
+      )))
 
 ;; This isn't currently in `font-lock-defaults' as probably not worth
 ;; it -- we basically only mess with a few normally-symbol characters.
@@ -1381,11 +1380,17 @@ Used for syntactic keywords.  N is the match number (1, 2 or 3)."
 	"-"
 	["Mark block" renpy-mark-block
 	 :help "Mark innermost block around point"]
+	["Mark def/class" mark-defun
+	 :help "Mark innermost definition around point"]
+	"-"
 	["Start of block" renpy-beginning-of-block
 	 :help "Go to start of innermost definition around point"]
 	["End of block" renpy-end-of-block
 	 :help "Go to end of innermost definition around point"]
-        ))
+	["Start of def/class" beginning-of-defun
+	 :help "Go to start of innermost definition around point"]
+	["End of def/class" end-of-defun
+	 :help "Go to end of innermost definition around point"]))
     map))
 
 ;; Fixme: add toolbar stuff for useful things like symbol help, send
@@ -1562,8 +1567,6 @@ statement."
   :group 'renpy
   :type 'integer)
 
-
-
 (defun renpy-guess-indent ()
   "Guess step for indentation of current buffer.
 Set `renpy-indent' locally to the value guessed."
@@ -1728,7 +1731,7 @@ Set `renpy-indent' locally to the value guessed."
   '(("else" "if" "elif" "while" "for" "try" "except")
     ("elif" "if" "elif")
     ("except" "try" "except")
-    ("finally" "try" "except"))
+    ("finally" "else" "try" "except"))
   "Alist of keyword matches.
 The car of an element is a keyword introducing a statement which
 can close a block opened by a keyword in the cdr.")
@@ -1953,32 +1956,24 @@ Finds end of innermost nested class or method definition."
 	(goto-char (point-max)))))
 
 (defun renpy-beginning-of-statement ()
-  "Go to start of current statement.
+  "Go to the start of current statement and return point.
 Accounts for continuation lines, multi-line strings, and
 multi-line bracketed expressions."
-  (beginning-of-line)
-  (renpy-beginning-of-string)
-  (let (point)
-    (while (and (renpy-continuation-line-p)
-		(if point
-		    (< (point) point)
-		  t))
-      (beginning-of-line)
+  (while
       (if (renpy-backslash-continuation-line-p)
-	  (progn
-	    (forward-line -1)
-	    (while (renpy-backslash-continuation-line-p)
-	      (forward-line -1)))
-	(renpy-beginning-of-string)
-	(renpy-skip-out))
-      (setq point (point))))
-  (back-to-indentation))
+	  (progn (forward-line -1) t)
+	(beginning-of-line)
+	(or (renpy-beginning-of-string)
+	    (renpy-skip-out))))
+  (back-to-indentation)
+  (point))
 
 (defun renpy-skip-out (&optional forward syntax)
   "Skip out of any nested brackets.
 Skip forward if FORWARD is non-nil, else backward.
 If SYNTAX is non-nil it is the state returned by `syntax-ppss' at point.
 Return non-nil if and only if skipping was done."
+  ;; FIXME: Use syntax-ppss-toplevel-pos.
   (let ((depth (syntax-ppss-depth (or syntax (syntax-ppss))))
 	(forward (if forward -1 1)))
     (unless (zerop depth)
@@ -2011,18 +2006,19 @@ On a comment line, go to end of line."
 			   nil)
 			  ((eq 'string (syntax-ppss-context s))
 			   ;; Go to start of string and skip it.
-                           (let ((pos (point)))
-                             (goto-char (nth 8 s))
-                             (condition-case () ; beware invalid syntax
-                                 (progn (forward-sexp) t)
-                               ;; If there's a mismatched string, make sure
-                               ;; we still overall move *forward*.
-                               (error (goto-char pos) (end-of-line)))))
+			   (let ((pos (point)))
+			     (goto-char (nth 8 s))
+			     (condition-case () ; beware invalid syntax
+				 (progn (forward-sexp) t)
+			       ;; If there's a mismatched string, make sure
+			       ;; we still overall move *forward*.
+			       (error (goto-char pos) (end-of-line)))))
 			  ((renpy-skip-out t s))))
 	     (end-of-line))
-	   (unless comment
-	     (eq ?\\ (char-before))))	; Line continued?
-    (end-of-line 2))			; Try next line.
+	   (and (not comment)
+		(not (eobp))
+		(eq ?\\ (char-before)))) ; Line continued?
+    (end-of-line 2))			 ; Try next line.
   (point))
 
 (defun renpy-previous-statement (&optional count)
@@ -2139,7 +2135,7 @@ don't move and return nil.  Otherwise return t."
 
 ;;;; Imenu.
 
-;; For possibily speeding this up, here's the top of the ELP profile
+;; For possibly speeding this up, here's the top of the ELP profile
 ;; for rescanning pydoc.py (2.2k lines, 90kb):
 ;; Function Name                         Call Count  Elapsed Time  Average Time
 ;; ====================================  ==========  =============  ============
@@ -2216,13 +2212,13 @@ the string's indentation."
 		;; paragraph in a multi-line string properly, so narrow
 		;; to the string and then fill around (the end of) the
 		;; current line.
-		((eq t (nth 3 syntax))	; in fenced string
+		((nth 3 syntax)	; in fenced string
 		 (goto-char (nth 8 syntax)) ; string start
 		 (setq start (line-beginning-position))
 		 (setq end (condition-case () ; for unbalanced quotes
-                               (progn (forward-sexp)
-                                      (- (point) 3))
-                             (error (point-max)))))
+			       (progn (forward-sexp)
+				      (- (point) 3))
+			     (error (point-max)))))
 		((re-search-backward "\\s|\\s-*\\=" nil t) ; end of fenced string
 		 (forward-char)
 		 (setq end (point))
@@ -2392,12 +2388,12 @@ with skeleton expansions for compound statement templates.
   :group 'renpy
   (set (make-local-variable 'font-lock-defaults)
        '(renpy-font-lock-keywords nil nil nil nil
-				   (font-lock-syntactic-keywords
-				    . renpy-font-lock-syntactic-keywords)
-				   ;; This probably isn't worth it.
-				   ;; (font-lock-syntactic-face-function
-				   ;;  . renpy-font-lock-syntactic-face-function)
-				   ))
+	 ;; This probably isn't worth it.
+	 ;; (font-lock-syntactic-face-function
+	 ;;  . renpy-font-lock-syntactic-face-function)
+	 ))
+  (set (make-local-variable 'syntax-propertize-function)
+       renpy-syntax-propertize-function)
   (set (make-local-variable 'parse-sexp-lookup-properties) t)
   (set (make-local-variable 'parse-sexp-ignore-comments) t)
   (set (make-local-variable 'comment-start) "# ")
@@ -2426,40 +2422,21 @@ with skeleton expansions for compound statement templates.
   
   (set (make-local-variable 'eldoc-documentation-function)
        #'renpy-eldoc-function)
-;;  (add-hook 'eldoc-mode-hook
-;;	    (lambda () (run-renpy nil t)) ; need it running
-;;	    nil t)
-  (set (make-local-variable 'symbol-completion-symbol-function)
-       'renpy-partial-symbol)
-  (set (make-local-variable 'symbol-completion-completions-function)
-       'renpy-symbol-completions)
-  ;; Fixme: should be in hideshow.  This seems to be of limited use
-  ;; since it isn't (can't be) indentation-based.  Also hide-level
-  ;; doesn't seem to work properly.
-  (add-to-list 'hs-special-modes-alist
-	       `(renpy-mode "^\\s-*\\(?:def\\|class\\)\\>" nil "#"
-		 ,(lambda (arg)
-		    (renpy-end-of-defun)
-		    (skip-chars-backward " \t\n"))
-		 nil))
+  (add-hook 'eldoc-mode-hook
+	    (lambda () (run-renpy nil t)) ; need it running
+	    nil t)
+  (add-hook 'completion-at-point-functions
+	    'renpy-completion-at-point nil 'local)
   (set (make-local-variable 'skeleton-further-elements)
        '((< '(backward-delete-char-untabify (min renpy-indent
 						 (current-column))))
 	 (^ '(- (1+ (current-indentation))))))
-  ;; Let's not mess with hippie-expand.  Symbol-completion should rather be
-  ;; bound to another key, since it has different performance requirements.
-  ;; (if (featurep 'hippie-exp)
-  ;;     (set (make-local-variable 'hippie-expand-try-functions-list)
-  ;;          (cons 'symbol-completion-try-complete
-  ;;       	 hippie-expand-try-functions-list)))
   ;; Renpy defines TABs as being 8-char wide.
   (set (make-local-variable 'tab-width) 8)
-  (unless font-lock-mode (font-lock-mode 1))
   (when renpy-guess-indent (renpy-guess-indent))
   ;; Let's make it harder for the user to shoot himself in the foot.
   (unless (= tab-width renpy-indent)
-    (setq indent-tabs-mode nil))
-  )
+    (setq indent-tabs-mode nil)))
 
 ;; Not done automatically in Emacs 21 or 22.
 (defcustom renpy-mode-hook nil
@@ -2473,8 +2450,6 @@ with skeleton expansions for compound statement templates.
 		     (setq indent-tabs-mode nil)))
 (custom-add-option 'renpy-mode-hook 'turn-on-eldoc-mode)
 (custom-add-option 'renpy-mode-hook 'abbrev-mode)
-(custom-add-option 'renpy-mode-hook 'renpy-setup-brm)
-
 
 (defun renpy-in-literal ()
   (syntax-ppss-context (syntax-ppss)))
@@ -2503,7 +2478,7 @@ with skeleton expansions for compound statement templates.
 (defun renpy-indent-line (&optional arg)
   (interactive)
 
-  ; Let python-mode indent. (Always needed to keep python-mode sane.)
+  ; Let renpy-mode indent. (Always needed to keep python-mode sane.)
   (renpy-indent-line-2)
 
   ; Reindent strings if appropriate.
@@ -2521,7 +2496,6 @@ with skeleton expansions for compound statement templates.
 
   )
 
-
 ; Computes the start of the current string.
 (defun renpy-string-start ()
   (nth 8 (parse-partial-sexp (point-min) (point)))
@@ -2537,7 +2511,6 @@ with skeleton expansions for compound statement templates.
        )
      )
   )
-
 
 
 (provide 'renpy)
