@@ -1,206 +1,321 @@
-;;; renpy.el --- silly walks for Renpy  -*- coding: iso-8859-1 -*-
+;;; renpy.el --- Major mode for editing Ren'Py files -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009
+;; Copyright (C) 2003-2013
 ;;   Free Software Foundation, Inc.
-;; Copyright (C) 2018
+;; Copyright (C) 2018-2019
 ;;   Billy Wade
+;; Copyright (C) 2020
+;;   Reagan Middlebrook
+;; Copyright (C) 2023
+;;   Morgan Willcock
 
-;; Author: PyTom <pytom@bishoujo.us>
-
-;; Based on python.el, which has the following maintainership:
-
-;; Maintainer: Dave Love <fx@gnu.org>; Quildreen Motta <https://github.com/robotlolita>; Billy Wade <https://github.com/billywade>
-;; Created: Nov 2003
-;; Version: 0.3
-;; Homepage: https://github.com/billywade/renpy-mode
+;; Author: Dave Love <fx@gnu.org>, PyTom <pytom@bishoujo.us>
 ;; Keywords: languages
+;; Maintainer: Reagan Middlebrook <reagankm@gmail.com>
+;; Package-Requires: ((emacs "27.1"))
+;; URL: https://github.com/Reagankm/renpy-mode
+;; Version: 0.3
 
-;;; Commentary:
-
-;; PyTom's old major mode for Ren'Py, the visual studio engine
-
-;;; License:
-
-;; This file is part of GNU Emacs.
-
-;; GNU Emacs is free software: you can redistribute it and/or modify
+;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
 ;; the Free Software Foundation, either version 3 of the License, or
 ;; (at your option) any later version.
 
-;; GNU Emacs is distributed in the hope that it will be useful,
+;; This program is distributed in the hope that it will be useful,
 ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
 ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+;;; Commentary:
+
+;; A major mode for Ren'Py based on Dave Love's python.el.
 
 ;;; Code:
 
-(setq renpy-generic-imenu 
-      '( ( nil "\\b\\(label\\|menu\\)\\s-+\\(\\w+\\):" 2)
-         ( nil "\\b\\(screen\\)\\s-+\\(\\w+\\):" 2)
-         ( nil "\\b\\(transform\\)\\s-+\\(\\w+\\):" 2)
-         ; ( nil "\\bcall\\s-+\\w+\\s-+from\\s-+\\(\\w+\\)" 1)
-         ( nil "\\b\\(def\\|class\\)\\s-+\\(\\w+\\)" 2)
-         ))
-
-(require 'comint)
-
-(eval-when-compile
-  (require 'compile)
-  (require 'hippie-exp))
-
-(autoload 'comint-mode "comint")
+(require 'imenu)
 
 (defgroup renpy nil
-  "Silly walks in the Renpy language."
+  "Major mode for editing Ren'Py files."
+  :tag "Ren'Py"
+  :prefix "renpy-"
   :group 'languages
-  :version "22.1"
   :link '(emacs-commentary-link "renpy"))
 
 ;;;###autoload
-(add-to-list 'auto-mode-alist '("\\.rpy\\'" . renpy-mode))
-(add-to-list 'auto-mode-alist '("\\.rpym\\'" . renpy-mode))
-(add-to-list 'same-window-buffer-names "*Renpy*")
+(add-to-list 'auto-mode-alist '("\\.rpym?\\'" . renpy-mode))
+
+;;;; Search patterns
+
+(defmacro renpy-rx (&rest regexps)
+  "Extended version of `rx' for translation of form REGEXPS."
+  `(rx-let (;; User defined names.
+	    (name
+	     (seq symbol-start
+		  (or alpha "_")
+		  (0+ (or alphanumeric "_"))
+		  symbol-end))
+	    (image-name
+	     (seq symbol-start
+		  (1+ (or alphanumeric "_"))
+		  symbol-end))
+	    ;; Labels.	It is not a logical error if the label definition
+	    ;; doesn't begin at the start of the line.
+	    (label-keyword
+	     (seq line-start (0+ space) "label" symbol-end))
+	    ;; Screens.
+	    (screen-keyword
+	     (seq line-start "screen" symbol-end))
+	    ;; Styles.
+	    (style-keyword
+	     (seq line-start "style" symbol-end))
+	    ;; Transforms
+	    (transform-keyword
+	     (seq line-start "transform" symbol-end))
+	    ;; Images.
+	    (image-keyword
+	     (seq line-start "image" symbol-end))
+	    ;; Define or default.  Allow indentation for use in explicit init
+	    ;; blocks or within a screen.
+	    (default-or-define-keyword
+	      (seq line-start (0+ space) (or "default" "define") symbol-end))
+	    ;; Init.
+	    (init-keyword
+	     (seq line-start "init" symbol-end))
+	    (init-argument
+	     (seq symbol-start (or "hide" "in" "offset" "python") symbol-end))
+	    ;; Keywords from sphinx/source/keywords.py.
+	    (keyword
+	     (seq symbol-start
+		  (or "$" "False" "IF" "None" "True" "add" "always" "and"
+		      "animation" "areapicker" "as" "assert" "async" "at"
+		      "attribute" "auto" "await" "bar" "behind" "block" "break"
+		      "button" "call" "camera" "choice" "circles" "class"
+		      "clear" "clockwise" "contains" "continue"
+		      "counterclockwise" "def" "default" "define" "del"
+		      "dismiss" "drag" "draggroup" "elif" "else" "event"
+		      "except" "expression" "finally" "fixed" "for" "frame"
+		      "from" "function" "global" "grid" "group" "has" "hbox"
+		      "hide" "hotbar" "hotspot" "if" "image" "imagebutton"
+		      "imagemap" "import" "in" "index" "init" "input" "is"
+		      "jump" "key" "knot" "label" "lambda" "layeredimage" "menu"
+		      "monologue" "mousearea" "music" "nearrect" "new"
+		      "nointeract" "nonlocal" "not" "null" "nvl" "offset" "old"
+		      "on" "onlayer" "or" "parallel" "pass" "pause" "play"
+		      "python" "queue" "raise" "repeat" "return" "rpy" "scene"
+		      "screen" "show" "showif" "side" "sound" "stop" "strings"
+		      "style" "sustain" "tag" "take" "testcase" "text"
+		      "textbutton" "time" "timer" "transclude" "transform"
+		      "translate" "try" "use" "vbar" "vbox" "viewport" "voice"
+		      "vpgrid" "while" "window" "with" "yield" "zorder")
+		  symbol-end))
+	    ;; Classes and functions from
+	    ;; https://www.renpy.org/doc/html/py-function-class-index.html.
+	    ;; Note: Any name containing a "." was ommited to try and keep the
+	    ;; highlighting consistent with the use of other python modules.
+	    ;; Variables were not included for the same reason.
+	    (class-or-function
+	     (seq symbol-start
+		  (or "AddToSet" "AlphaBlend" "AlphaDissolve" "AlphaMask"
+		      "AnimatedValue" "At" "Attribute" "AudioData"
+		      "AudioPositionValue" "add" "BarValue" "Borders"
+		      "BrightnessMatrix" "Call" "CaptureFocus" "Character"
+		      "ClearFocus" "Color" "ColorizeMatrix" "ComposeTransition"
+		      "Composite" "Condition" "ConditionSwitch" "Confirm"
+		      "ContrastMatrix" "Crop" "CropMove" "DictInputValue"
+		      "DictValue" "DisableAllInputValues" "Dissolve" "Drag"
+		      "DragGroup" "DynamicDisplayable" "DynamicImage" "Editor"
+		      "EndReplay" "Fade" "FieldInputValue" "FieldValue"
+		      "FileAction" "FileCurrentPage" "FileCurrentScreenshot"
+		      "FileDelete" "FileJson" "FileLoad" "FileLoadable"
+		      "FileNewest" "FilePage" "FilePageName"
+		      "FilePageNameInputValue" "FilePageNext" "FilePagePrevious"
+		      "FileSave" "FileSaveName" "FileScreenshot" "FileSlotName"
+		      "FileTakeScreenshot" "FileTime" "FileUsedSlots" "Fixed"
+		      "Flatten" "FontGroup" "Frame" "Function" "Gallery"
+		      "GamepadCalibrate" "GamepadExists" "GetCharacterVolume"
+		      "GetFocusRect" "GetTooltip" "Grid" "HBox" "Help" "Hide"
+		      "HideInterface" "HistoryEntry" "HueMatrix"
+		      "IdentityMatrix" "If" "Image" "ImageDissolve" "InputValue"
+		      "InvertMatrix" "InvertSelected" "Jump" "Language"
+		      "LayeredImage" "LayeredImageProxy" "Lexer" "Live2D"
+		      "MainMenu" "Matrix" "MixerValue" "Model"
+		      "MouseDisplayable" "MouseMove" "MoveTransition" "Movie"
+		      "MultiPersistent" "MultipleTransition" "MusicRoom"
+		      "NoRollback" "Notify" "Null" "NullAction" "nvl_clear"
+		      "nvl_hide" "nvl_menu" "nvl_show" "OffsetMatrix"
+		      "OpacityMatrix" "OpenDirectory" "OpenURL"
+		      "ParameterizedText" "Pause" "PauseAudio" "Pixellate"
+		      "Placeholder" "Play" "PlayCharacterVoice" "Preference"
+		      "PushMove" "Queue" "QueueEvent" "QuickLoad" "QuickSave"
+		      "Quit" "RemoveFromSet" "Replay" "RestartStatement"
+		      "Return" "RollForward" "Rollback" "RollbackToIdentifier"
+		      "RotateMatrix" "remap" "Sample" "SaturationMatrix"
+		      "ScaleMatrix" "ScreenVariableInputValue"
+		      "ScreenVariableValue" "Screenshot" "Scroll" "SelectedIf"
+		      "SensitiveIf" "SepiaMatrix" "SetCharacterVolume" "SetDict"
+		      "SetField" "SetLocalVariable" "SetMixer" "SetMute"
+		      "SetScreenVariable" "SetVariable" "SetVoiceMute" "Show"
+		      "ShowMenu" "ShowTransient" "ShowingSwitch" "SideImage"
+		      "Skip" "SlottedNoRollback" "SnowBlossom" "Solid" "Sprite"
+		      "SpriteManager" "Start" "StaticValue" "Stop" "Style"
+		      "StylePreference" "Swing" "Text" "Tile" "TintMatrix"
+		      "ToggleDict" "ToggleField" "ToggleFocus"
+		      "ToggleLocalVariable" "ToggleMute" "ToggleScreen"
+		      "ToggleScreenVariable" "ToggleSetMembership"
+		      "ToggleVariable" "ToggleVoiceMute" "Tooltip" "Transform"
+		      "translate_define" "translate_font" "VBox"
+		      "VariableInputValue" "VariableValue" "VoiceReplay"
+		      "voice_can_replay" "voice_replay" "voice_sustain" "With"
+		      "XScrollValue" "YScrollValue" "_" "__" "_get_voice_info"
+		      "_p" "_window_hide" "_window_show")
+		  symbol-end))
+	    (transform-property
+	     (seq word-start
+		  (or "additive" "align" "alignaround" "alpha" "anchor" "angle"
+		      "around" "blend" "blur" "corner1" "corner2" "crop"
+		      "crop_relative" "delay" "events" "fit" "matrixanchor"
+		      "matrixcolor" "matrixtransform" "maxsize" "mesh"
+		      "mesh_pad" "nearest" "offset" "perspective" "pos" "radius"
+		      "rotate" "rotate_pad" "shader" "size" "subpixel"
+		      "transform_anchor" "xalign" "xanchor" "xcenter" "xoffset"
+		      "xpan" "xpos" "xsize" "xtile" "xycenter" "xysize" "xzoom"
+		      "yalign" "yanchor" "ycenter" "yoffset" "ypan" "ypos"
+		      "ysize" "ytile" "yzoom" "zoom" "zpos")
+		  symbol-end))
+	    ;; User Interface statements from
+	    ;; https://www.renpy.org/doc/html/screens.html#common-properties.
+	    (ui-statement
+	     (seq word-start
+		  (or "at" "default_focus" "id" "style" "style_prefix"
+		      "style_group" "style_suffix" "focus" "tooltip" "arguments"
+		      "properties")
+		  word-end))
+	    ;; Style properties from
+	    ;; https://www.renpy.org/doc/html/std-style-property-index.html.
+	    (style-prefix
+	     (seq word-start
+		  (or "idle" "hover" "selected" "insensitive" "selected_idle"
+		      "selected_hover" "selected_insensitive")
+		  ?_
+		  word-start))
+	    (style-prefix-text
+	     (seq symbol-start "text_" word-start))
+	    (style-prefix-scrollbar
+	     (seq symbol-start (optional ?v) "scrollbar_" word-start))
+	    (style-prefix-side
+	     (seq symbol-start "side_" word-start))
+	    (style-prefix-viewport
+	     (seq symbol-start "viewport_" word-start))
+	    (style-position
+	     (seq word-start
+		  (or "alt" "xpos" "ypos" "pos" "xanchor" "yanchor" "anchor"
+		      "xalign" "yalign" "align" "xcenter" "ycenter" "xoffset"
+		      "yoffset" "offset" "xmaximum" "ymaximum" "maximum"
+		      "xminimum" "yminimum" "minimum" "xsize" "ysize" "xysize"
+		      "xfill" "yfill" "area" "mipmap")
+		  symbol-end))
+	    (style-text
+	     (seq word-start
+		  (or "antialias" "adjust_spacing" "altruby_style" "black_color"
+		      "bold" "caret" "color" "first_indent" "font" "size"
+		      "italic" "justify" "kerning" "language" "layout"
+		      "line_leading" "line_overlap_split" "line_spacing"
+		      "min_width" "newline_indent" "outlines" "style"
+		      "outline_scaling" "rest_indent" "ruby_style"
+		      "slow_abortable" "slow_cps" "slow_cps_multiplier"
+		      "strikethrough" "text_align" "underline"
+		      "hyperlink_functions" "vertical" "hinting")
+		  symbol-end))
+	    (style-window
+	     (seq word-start
+		  (or "background" "foreground" "left_padding" "right_padding"
+		      "xpadding" "top_padding" "bottom_padding" "ypadding"
+		      "padding" "size_group" "modal")
+		  symbol-end))
+	    (style-button
+	     (seq word-start
+		  (or "child" "hover_sound" "activate_sound" "mouse"
+		      "focus_mask" "keyboard_focus" "key_events")
+		  symbol-end))
+	    (style-bar
+	     (seq word-start
+		  (or "bar_vertical" "bar_invert" "bar_resizing" "left_gutter"
+		      "right_gutter" "top_gutter" "bottom_gutter" "left_bar"
+		      "right_bar" "top_bar" "bottom_bar" "base_bar" "thumb"
+		      "thumb_shadow" "thumb_offset" "mouse" "unscrollable"
+		      "keyboard_focus")
+		  symbol-end))
+	    (style-box
+	     (seq word-start
+		  (or "spacing" "first_spacing" "box_reverse" "box_wrap"
+		      "box_wrap_spacing" "order_reverse")
+		  symbol-end))
+	    (style-grid
+	     (seq word-start
+		  (or "spacing" "xspacing" "yspacing")
+		  symbol-end))
+	    (style-fixed
+	     (seq word-start
+		  (or "fit_first" "xfit" "yfit")
+		  symbol-end))
+	    (style-margin
+	     (seq word-start
+		  (or "left_margin" "right_margin" "xmargin" "top_margin"
+		      "bottom_margin" "ymargin" "margin")
+		  symbol-end))
+	    ;; Warper functions from
+	    ;; https://www.renpy.org/doc/html/atl.html#warpers.
+	    (warper
+	     (seq symbol-start
+		  (or "pause" "linear" "ease" "easein" "easeout"
+
+		      "ease_back" "ease_bounce" "ease_circ" "ease_cubic"
+		      "ease_elastic" "ease_expo" "ease_quad" "ease_quart"
+		      "ease_quint" "easein_back" "easein_bounce" "easein_circ"
+		      "easein_cubic" "easein_elastic" "easein_expo"
+		      "easein_quad" "easein_quart" "easein_quint"
+		      "easeout_back" "easeout_bounce" "easeout_circ"
+		      "easeout_cubic" "easeout_elastic" "easeout_expo"
+		      "easeout_quad" "easeout_quart" "easeout_quint")
+		  symbol-end)))
+     (rx ,@regexps)))
 
 ;;;; Font lock
 
 (defvar renpy-font-lock-keywords
   `(,(rx symbol-start
-	 ;; From v 2.5 reference, � keywords.
+	 ;; From v 2.7 Keywords reference.
 	 ;; def and class dealt with separately below
 	 (or "and" "as" "assert" "break" "continue" "del" "elif" "else"
 	     "except" "exec" "finally" "for" "from" "global" "if"
 	     "import" "in" "is" "lambda" "not" "or" "pass" "print"
 	     "raise" "return" "try" "while" "with" "yield"
-             ;; Not real keywords, but close enough to be fontified as such
-             "self" "True" "False"
-"$"
-"add"
-"and"
-"animation"
-"as"
-"as"
-"assert"
-"at"
-"bar"
-"behind"
-"block"
-"break"
-"button"
-"call"
-"choice"
-"circles"
-"class"
-"clockwise"
-"contains"
-"continue"
-"counterclockwise"
-"def"
-"define"
-"del"
-"elif"
-"else"
-"event"
-"except"
-"exec"
-"expression"
-"finally"
-"fixed"
-"for"
-"frame"
-"from"
-"function"
-"global"
-"grid"
-"has"
-"hbox"
-"hide"
-"hotbar"
-"hotspot"
-"if"
-"if"
-"image"
-"imagebutton"
-"imagemap"
-"import"
-"in"
-"in"
-"init"
-"input"
-"is"
-"jump"
-"key"
-"knot"
-"label"
-"lambda"
-"menu"
-"not"
-"null"
-"nvl"
-"on"
-"onlayer"
-"or"
-"parallel"
-"pass"
-"pause"
-"play"
-"print"
-"python"
-"queue"
-"raise"
-"repeat"
-"return"
-"return"
-"scene"
-"screen"
-"set"
-"show"
-"side"
-"stop"
-"text"
-"textbutton"
-"time"
-"timer"
-"transform"
-"transform"
-"try"
-"use"
-"vbar"
-"vbox"
-"viewport"
-"while"
-"while"
-"window"
-"with"
-"with"
-"yield"
-"zorder"
-             )
+	     ;; Not real keywords, but close enough to be fontified as such
+	     "self" "True" "False"
+	     ;; Python 3
+	     "nonlocal")
 	 symbol-end)
-    (,(rx symbol-start "None" symbol-end)	; see � Keywords in 2.5 manual
+    (,(rx symbol-start "None" symbol-end)	; see Keywords in 2.7 manual
      . font-lock-constant-face)
     ;; Definitions
     (,(rx symbol-start (group "class") (1+ space) (group (1+ (or word ?_))))
      (1 font-lock-keyword-face) (2 font-lock-type-face))
-    (,(rx symbol-start (group "label") (1+ space) (group (1+ (or word ?_))))
-     (1 font-lock-keyword-face) (2 font-lock-type-face))
-    (,(rx symbol-start (group "screen") (1+ space) (group (1+ (or word ?_))))
-     (1 font-lock-keyword-face) (2 font-lock-type-face))
-    (,(rx symbol-start (group "transform") (1+ space) (group (1+ (or word ?_))))
-     (1 font-lock-keyword-face) (2 font-lock-type-face))
     (,(rx symbol-start (group "def") (1+ space) (group (1+ (or word ?_))))
      (1 font-lock-keyword-face) (2 font-lock-function-name-face))
     ;; Top-level assignments are worth highlighting.
-    (,(rx line-start (group (1+ (or word ?_))) (0+ space) "=")
+    (,(rx line-start (group (1+ (or word ?_))) (0+ space)
+	  (opt (or "+" "-" "*" "**" "/" "//" "&" "%" "|" "^" "<<" ">>")) "=")
      (1 font-lock-variable-name-face))
-    (,(rx line-start (* (any " \t")) (group "@" (1+ (or word ?_)))) ; decorators
+    ;; Decorators.
+    (,(rx line-start (* (any " \t")) (group "@" (1+ (or word ?_))
+					    (0+ "." (1+ (or word ?_)))))
      (1 font-lock-type-face))
     ;; Built-ins.  (The next three blocks are from
-    ;; `__builtin__.__dict__.keys()' in Renpy 2.5.1.)  These patterns
-    ;; are debateable, but they at least help to spot possible
+    ;; `__builtin__.__dict__.keys()' in Python 2.7)  These patterns
+    ;; are debatable, but they at least help to spot possible
     ;; shadowing of builtins.
     (,(rx symbol-start (or
 	  ;; exceptions
@@ -217,7 +332,10 @@
 	  "SystemExit" "TabError" "TypeError" "UnboundLocalError"
 	  "UnicodeDecodeError" "UnicodeEncodeError" "UnicodeError"
 	  "UnicodeTranslateError" "UnicodeWarning" "UserWarning"
-	  "ValueError" "Warning" "ZeroDivisionError") symbol-end)
+	  "ValueError" "Warning" "ZeroDivisionError"
+	  ;; Python 2.7
+	  "BufferError" "BytesWarning" "WindowsError")
+	  symbol-end)
      . font-lock-type-face)
     (,(rx (or line-start (not (any ". \t"))) (* (any " \t")) symbol-start
 	  (group (or
@@ -235,1063 +353,95 @@
 	  "round" "set" "setattr" "slice" "sorted" "staticmethod"
 	  "str" "sum" "super" "tuple" "type" "unichr" "unicode" "vars"
 	  "xrange" "zip"
-"action"
-"activate_align"
-"activate_alignaround"
-"activate_alpha"
-"activate_anchor"
-"activate_angle"
-"activate_antialias"
-"activate_area"
-"activate_around"
-"activate_background"
-"activate_bar_invert"
-"activate_bar_resizing"
-"activate_bar_vertical"
-"activate_black_color"
-"activate_bold"
-"activate_bottom_bar"
-"activate_bottom_gutter"
-"activate_bottom_margin"
-"activate_bottom_padding"
-"activate_box_layout"
-"activate_clipping"
-"activate_color"
-"activate_corner1"
-"activate_corner2"
-"activate_crop"
-"activate_delay"
-"activate_drop_shadow"
-"activate_drop_shadow_color"
-"activate_first_indent"
-"activate_first_spacing"
-"activate_fit_first"
-"activate_font"
-"activate_foreground"
-"activate_italic"
-"activate_justify"
-"activate_language"
-"activate_layout"
-"activate_left_bar"
-"activate_left_gutter"
-"activate_left_margin"
-"activate_left_padding"
-"activate_line_spacing"
-"activate_min_width"
-"activate_minwidth"
-"activate_mouse"
-"activate_offset"
-"activate_outlines"
-"activate_pos"
-"activate_radius"
-"activate_rest_indent"
-"activate_right_bar"
-"activate_right_gutter"
-"activate_right_margin"
-"activate_right_padding"
-"activate_rotate"
-"activate_rotate_pad"
-"activate_size"
-"activate_size_group"
-"activate_slow_abortable"
-"activate_slow_cps"
-"activate_slow_cps_multiplier"
-"activate_sound"
-"activate_spacing"
-"activate_subpixel"
-"activate_text_align"
-"activate_text_y_fudge"
-"activate_thumb"
-"activate_thumb_offset"
-"activate_thumb_shadow"
-"activate_top_bar"
-"activate_top_gutter"
-"activate_top_margin"
-"activate_top_padding"
-"activate_underline"
-"activate_unscrollable"
-"activate_xalign"
-"activate_xanchor"
-"activate_xanchoraround"
-"activate_xaround"
-"activate_xfill"
-"activate_xmargin"
-"activate_xmaximum"
-"activate_xminimum"
-"activate_xoffset"
-"activate_xpadding"
-"activate_xpos"
-"activate_xzoom"
-"activate_yalign"
-"activate_yanchor"
-"activate_yanchoraround"
-"activate_yaround"
-"activate_yfill"
-"activate_ymargin"
-"activate_ymaximum"
-"activate_yminimum"
-"activate_yoffset"
-"activate_ypadding"
-"activate_ypos"
-"activate_yzoom"
-"activate_zoom"
-"adjustment"
-"align"
-"alignaround"
-"allow"
-"alpha"
-"anchor"
-"angle"
-"antialias"
-"area"
-"around"
-"auto"
-"background"
-"bar_invert"
-"bar_resizing"
-"bar_vertical"
-"black_color"
-"bold"
-"bottom_bar"
-"bottom_gutter"
-"bottom_margin"
-"bottom_padding"
-"box_layout"
-"changed"
-"child_size"
-"clicked"
-"clipping"
-"color"
-"corner1"
-"corner2"
-"crop"
-"default"
-"delay"
-"draggable"
-"drop_shadow"
-"drop_shadow_color"
-"exclude"
-"first_indent"
-"first_spacing"
-"fit_first"
-"focus"
-"font"
-"foreground"
-"ground"
-"height"
-"hover"
-"hover_align"
-"hover_alignaround"
-"hover_alpha"
-"hover_anchor"
-"hover_angle"
-"hover_antialias"
-"hover_area"
-"hover_around"
-"hover_background"
-"hover_bar_invert"
-"hover_bar_resizing"
-"hover_bar_vertical"
-"hover_black_color"
-"hover_bold"
-"hover_bottom_bar"
-"hover_bottom_gutter"
-"hover_bottom_margin"
-"hover_bottom_padding"
-"hover_box_layout"
-"hover_clipping"
-"hover_color"
-"hover_corner1"
-"hover_corner2"
-"hover_crop"
-"hover_delay"
-"hover_drop_shadow"
-"hover_drop_shadow_color"
-"hover_first_indent"
-"hover_first_spacing"
-"hover_fit_first"
-"hover_font"
-"hover_foreground"
-"hover_italic"
-"hover_justify"
-"hover_language"
-"hover_layout"
-"hover_left_bar"
-"hover_left_gutter"
-"hover_left_margin"
-"hover_left_padding"
-"hover_line_spacing"
-"hover_min_width"
-"hover_minwidth"
-"hover_mouse"
-"hover_offset"
-"hover_outlines"
-"hover_pos"
-"hover_radius"
-"hover_rest_indent"
-"hover_right_bar"
-"hover_right_gutter"
-"hover_right_margin"
-"hover_right_padding"
-"hover_rotate"
-"hover_rotate_pad"
-"hover_size"
-"hover_size_group"
-"hover_slow_abortable"
-"hover_slow_cps"
-"hover_slow_cps_multiplier"
-"hover_sound"
-"hover_spacing"
-"hover_subpixel"
-"hover_text_align"
-"hover_text_y_fudge"
-"hover_thumb"
-"hover_thumb_offset"
-"hover_thumb_shadow"
-"hover_top_bar"
-"hover_top_gutter"
-"hover_top_margin"
-"hover_top_padding"
-"hover_underline"
-"hover_unscrollable"
-"hover_xalign"
-"hover_xanchor"
-"hover_xanchoraround"
-"hover_xaround"
-"hover_xfill"
-"hover_xmargin"
-"hover_xmaximum"
-"hover_xminimum"
-"hover_xoffset"
-"hover_xpadding"
-"hover_xpos"
-"hover_xzoom"
-"hover_yalign"
-"hover_yanchor"
-"hover_yanchoraround"
-"hover_yaround"
-"hover_yfill"
-"hover_ymargin"
-"hover_ymaximum"
-"hover_yminimum"
-"hover_yoffset"
-"hover_ypadding"
-"hover_ypos"
-"hover_yzoom"
-"hover_zoom"
-"hovered"
-"id"
-"idle"
-"idle_align"
-"idle_alignaround"
-"idle_alpha"
-"idle_anchor"
-"idle_angle"
-"idle_antialias"
-"idle_area"
-"idle_around"
-"idle_background"
-"idle_bar_invert"
-"idle_bar_resizing"
-"idle_bar_vertical"
-"idle_black_color"
-"idle_bold"
-"idle_bottom_bar"
-"idle_bottom_gutter"
-"idle_bottom_margin"
-"idle_bottom_padding"
-"idle_box_layout"
-"idle_clipping"
-"idle_color"
-"idle_corner1"
-"idle_corner2"
-"idle_crop"
-"idle_delay"
-"idle_drop_shadow"
-"idle_drop_shadow_color"
-"idle_first_indent"
-"idle_first_spacing"
-"idle_fit_first"
-"idle_font"
-"idle_foreground"
-"idle_italic"
-"idle_justify"
-"idle_language"
-"idle_layout"
-"idle_left_bar"
-"idle_left_gutter"
-"idle_left_margin"
-"idle_left_padding"
-"idle_line_spacing"
-"idle_min_width"
-"idle_minwidth"
-"idle_mouse"
-"idle_offset"
-"idle_outlines"
-"idle_pos"
-"idle_radius"
-"idle_rest_indent"
-"idle_right_bar"
-"idle_right_gutter"
-"idle_right_margin"
-"idle_right_padding"
-"idle_rotate"
-"idle_rotate_pad"
-"idle_size"
-"idle_size_group"
-"idle_slow_abortable"
-"idle_slow_cps"
-"idle_slow_cps_multiplier"
-"idle_sound"
-"idle_spacing"
-"idle_subpixel"
-"idle_text_align"
-"idle_text_y_fudge"
-"idle_thumb"
-"idle_thumb_offset"
-"idle_thumb_shadow"
-"idle_top_bar"
-"idle_top_gutter"
-"idle_top_margin"
-"idle_top_padding"
-"idle_underline"
-"idle_unscrollable"
-"idle_xalign"
-"idle_xanchor"
-"idle_xanchoraround"
-"idle_xaround"
-"idle_xfill"
-"idle_xmargin"
-"idle_xmaximum"
-"idle_xminimum"
-"idle_xoffset"
-"idle_xpadding"
-"idle_xpos"
-"idle_xzoom"
-"idle_yalign"
-"idle_yanchor"
-"idle_yanchoraround"
-"idle_yaround"
-"idle_yfill"
-"idle_ymargin"
-"idle_ymaximum"
-"idle_yminimum"
-"idle_yoffset"
-"idle_ypadding"
-"idle_ypos"
-"idle_yzoom"
-"idle_zoom"
-"image_style"
-"insensitive"
-"insensitive_align"
-"insensitive_alignaround"
-"insensitive_alpha"
-"insensitive_anchor"
-"insensitive_angle"
-"insensitive_antialias"
-"insensitive_area"
-"insensitive_around"
-"insensitive_background"
-"insensitive_bar_invert"
-"insensitive_bar_resizing"
-"insensitive_bar_vertical"
-"insensitive_black_color"
-"insensitive_bold"
-"insensitive_bottom_bar"
-"insensitive_bottom_gutter"
-"insensitive_bottom_margin"
-"insensitive_bottom_padding"
-"insensitive_box_layout"
-"insensitive_clipping"
-"insensitive_color"
-"insensitive_corner1"
-"insensitive_corner2"
-"insensitive_crop"
-"insensitive_delay"
-"insensitive_drop_shadow"
-"insensitive_drop_shadow_color"
-"insensitive_first_indent"
-"insensitive_first_spacing"
-"insensitive_fit_first"
-"insensitive_font"
-"insensitive_foreground"
-"insensitive_italic"
-"insensitive_justify"
-"insensitive_language"
-"insensitive_layout"
-"insensitive_left_bar"
-"insensitive_left_gutter"
-"insensitive_left_margin"
-"insensitive_left_padding"
-"insensitive_line_spacing"
-"insensitive_min_width"
-"insensitive_minwidth"
-"insensitive_mouse"
-"insensitive_offset"
-"insensitive_outlines"
-"insensitive_pos"
-"insensitive_radius"
-"insensitive_rest_indent"
-"insensitive_right_bar"
-"insensitive_right_gutter"
-"insensitive_right_margin"
-"insensitive_right_padding"
-"insensitive_rotate"
-"insensitive_rotate_pad"
-"insensitive_size"
-"insensitive_size_group"
-"insensitive_slow_abortable"
-"insensitive_slow_cps"
-"insensitive_slow_cps_multiplier"
-"insensitive_sound"
-"insensitive_spacing"
-"insensitive_subpixel"
-"insensitive_text_align"
-"insensitive_text_y_fudge"
-"insensitive_thumb"
-"insensitive_thumb_offset"
-"insensitive_thumb_shadow"
-"insensitive_top_bar"
-"insensitive_top_gutter"
-"insensitive_top_margin"
-"insensitive_top_padding"
-"insensitive_underline"
-"insensitive_unscrollable"
-"insensitive_xalign"
-"insensitive_xanchor"
-"insensitive_xanchoraround"
-"insensitive_xaround"
-"insensitive_xfill"
-"insensitive_xmargin"
-"insensitive_xmaximum"
-"insensitive_xminimum"
-"insensitive_xoffset"
-"insensitive_xpadding"
-"insensitive_xpos"
-"insensitive_xzoom"
-"insensitive_yalign"
-"insensitive_yanchor"
-"insensitive_yanchoraround"
-"insensitive_yaround"
-"insensitive_yfill"
-"insensitive_ymargin"
-"insensitive_ymaximum"
-"insensitive_yminimum"
-"insensitive_yoffset"
-"insensitive_ypadding"
-"insensitive_ypos"
-"insensitive_yzoom"
-"insensitive_zoom"
-"italic"
-"justify"
-"language"
-"layout"
-"left_bar"
-"left_gutter"
-"left_margin"
-"left_padding"
-"length"
-"line_spacing"
-"min_width"
-"minwidth"
-"mouse"
-"mousewheel"
-"offset"
-"outlines"
-"pos"
-"prefix"
-"radius"
-"range"
-"rest_indent"
-"right_bar"
-"right_gutter"
-"right_margin"
-"right_padding"
-"rotate"
-"rotate_pad"
-"selected_activate_align"
-"selected_activate_alignaround"
-"selected_activate_alpha"
-"selected_activate_anchor"
-"selected_activate_angle"
-"selected_activate_antialias"
-"selected_activate_area"
-"selected_activate_around"
-"selected_activate_background"
-"selected_activate_bar_invert"
-"selected_activate_bar_resizing"
-"selected_activate_bar_vertical"
-"selected_activate_black_color"
-"selected_activate_bold"
-"selected_activate_bottom_bar"
-"selected_activate_bottom_gutter"
-"selected_activate_bottom_margin"
-"selected_activate_bottom_padding"
-"selected_activate_box_layout"
-"selected_activate_clipping"
-"selected_activate_color"
-"selected_activate_corner1"
-"selected_activate_corner2"
-"selected_activate_crop"
-"selected_activate_delay"
-"selected_activate_drop_shadow"
-"selected_activate_drop_shadow_color"
-"selected_activate_first_indent"
-"selected_activate_first_spacing"
-"selected_activate_fit_first"
-"selected_activate_font"
-"selected_activate_foreground"
-"selected_activate_italic"
-"selected_activate_justify"
-"selected_activate_language"
-"selected_activate_layout"
-"selected_activate_left_bar"
-"selected_activate_left_gutter"
-"selected_activate_left_margin"
-"selected_activate_left_padding"
-"selected_activate_line_spacing"
-"selected_activate_min_width"
-"selected_activate_minwidth"
-"selected_activate_mouse"
-"selected_activate_offset"
-"selected_activate_outlines"
-"selected_activate_pos"
-"selected_activate_radius"
-"selected_activate_rest_indent"
-"selected_activate_right_bar"
-"selected_activate_right_gutter"
-"selected_activate_right_margin"
-"selected_activate_right_padding"
-"selected_activate_rotate"
-"selected_activate_rotate_pad"
-"selected_activate_size"
-"selected_activate_size_group"
-"selected_activate_slow_abortable"
-"selected_activate_slow_cps"
-"selected_activate_slow_cps_multiplier"
-"selected_activate_sound"
-"selected_activate_spacing"
-"selected_activate_subpixel"
-"selected_activate_text_align"
-"selected_activate_text_y_fudge"
-"selected_activate_thumb"
-"selected_activate_thumb_offset"
-"selected_activate_thumb_shadow"
-"selected_activate_top_bar"
-"selected_activate_top_gutter"
-"selected_activate_top_margin"
-"selected_activate_top_padding"
-"selected_activate_underline"
-"selected_activate_unscrollable"
-"selected_activate_xalign"
-"selected_activate_xanchor"
-"selected_activate_xanchoraround"
-"selected_activate_xaround"
-"selected_activate_xfill"
-"selected_activate_xmargin"
-"selected_activate_xmaximum"
-"selected_activate_xminimum"
-"selected_activate_xoffset"
-"selected_activate_xpadding"
-"selected_activate_xpos"
-"selected_activate_xzoom"
-"selected_activate_yalign"
-"selected_activate_yanchor"
-"selected_activate_yanchoraround"
-"selected_activate_yaround"
-"selected_activate_yfill"
-"selected_activate_ymargin"
-"selected_activate_ymaximum"
-"selected_activate_yminimum"
-"selected_activate_yoffset"
-"selected_activate_ypadding"
-"selected_activate_ypos"
-"selected_activate_yzoom"
-"selected_activate_zoom"
-"selected_align"
-"selected_alignaround"
-"selected_alpha"
-"selected_anchor"
-"selected_angle"
-"selected_antialias"
-"selected_area"
-"selected_around"
-"selected_background"
-"selected_bar_invert"
-"selected_bar_resizing"
-"selected_bar_vertical"
-"selected_black_color"
-"selected_bold"
-"selected_bottom_bar"
-"selected_bottom_gutter"
-"selected_bottom_margin"
-"selected_bottom_padding"
-"selected_box_layout"
-"selected_clipping"
-"selected_color"
-"selected_corner1"
-"selected_corner2"
-"selected_crop"
-"selected_delay"
-"selected_drop_shadow"
-"selected_drop_shadow_color"
-"selected_first_indent"
-"selected_first_spacing"
-"selected_fit_first"
-"selected_font"
-"selected_foreground"
-"selected_hover"
-"selected_hover_align"
-"selected_hover_alignaround"
-"selected_hover_alpha"
-"selected_hover_anchor"
-"selected_hover_angle"
-"selected_hover_antialias"
-"selected_hover_area"
-"selected_hover_around"
-"selected_hover_background"
-"selected_hover_bar_invert"
-"selected_hover_bar_resizing"
-"selected_hover_bar_vertical"
-"selected_hover_black_color"
-"selected_hover_bold"
-"selected_hover_bottom_bar"
-"selected_hover_bottom_gutter"
-"selected_hover_bottom_margin"
-"selected_hover_bottom_padding"
-"selected_hover_box_layout"
-"selected_hover_clipping"
-"selected_hover_color"
-"selected_hover_corner1"
-"selected_hover_corner2"
-"selected_hover_crop"
-"selected_hover_delay"
-"selected_hover_drop_shadow"
-"selected_hover_drop_shadow_color"
-"selected_hover_first_indent"
-"selected_hover_first_spacing"
-"selected_hover_fit_first"
-"selected_hover_font"
-"selected_hover_foreground"
-"selected_hover_italic"
-"selected_hover_justify"
-"selected_hover_language"
-"selected_hover_layout"
-"selected_hover_left_bar"
-"selected_hover_left_gutter"
-"selected_hover_left_margin"
-"selected_hover_left_padding"
-"selected_hover_line_spacing"
-"selected_hover_min_width"
-"selected_hover_minwidth"
-"selected_hover_mouse"
-"selected_hover_offset"
-"selected_hover_outlines"
-"selected_hover_pos"
-"selected_hover_radius"
-"selected_hover_rest_indent"
-"selected_hover_right_bar"
-"selected_hover_right_gutter"
-"selected_hover_right_margin"
-"selected_hover_right_padding"
-"selected_hover_rotate"
-"selected_hover_rotate_pad"
-"selected_hover_size"
-"selected_hover_size_group"
-"selected_hover_slow_abortable"
-"selected_hover_slow_cps"
-"selected_hover_slow_cps_multiplier"
-"selected_hover_sound"
-"selected_hover_spacing"
-"selected_hover_subpixel"
-"selected_hover_text_align"
-"selected_hover_text_y_fudge"
-"selected_hover_thumb"
-"selected_hover_thumb_offset"
-"selected_hover_thumb_shadow"
-"selected_hover_top_bar"
-"selected_hover_top_gutter"
-"selected_hover_top_margin"
-"selected_hover_top_padding"
-"selected_hover_underline"
-"selected_hover_unscrollable"
-"selected_hover_xalign"
-"selected_hover_xanchor"
-"selected_hover_xanchoraround"
-"selected_hover_xaround"
-"selected_hover_xfill"
-"selected_hover_xmargin"
-"selected_hover_xmaximum"
-"selected_hover_xminimum"
-"selected_hover_xoffset"
-"selected_hover_xpadding"
-"selected_hover_xpos"
-"selected_hover_xzoom"
-"selected_hover_yalign"
-"selected_hover_yanchor"
-"selected_hover_yanchoraround"
-"selected_hover_yaround"
-"selected_hover_yfill"
-"selected_hover_ymargin"
-"selected_hover_ymaximum"
-"selected_hover_yminimum"
-"selected_hover_yoffset"
-"selected_hover_ypadding"
-"selected_hover_ypos"
-"selected_hover_yzoom"
-"selected_hover_zoom"
-"selected_idle"
-"selected_idle_align"
-"selected_idle_alignaround"
-"selected_idle_alpha"
-"selected_idle_anchor"
-"selected_idle_angle"
-"selected_idle_antialias"
-"selected_idle_area"
-"selected_idle_around"
-"selected_idle_background"
-"selected_idle_bar_invert"
-"selected_idle_bar_resizing"
-"selected_idle_bar_vertical"
-"selected_idle_black_color"
-"selected_idle_bold"
-"selected_idle_bottom_bar"
-"selected_idle_bottom_gutter"
-"selected_idle_bottom_margin"
-"selected_idle_bottom_padding"
-"selected_idle_box_layout"
-"selected_idle_clipping"
-"selected_idle_color"
-"selected_idle_corner1"
-"selected_idle_corner2"
-"selected_idle_crop"
-"selected_idle_delay"
-"selected_idle_drop_shadow"
-"selected_idle_drop_shadow_color"
-"selected_idle_first_indent"
-"selected_idle_first_spacing"
-"selected_idle_fit_first"
-"selected_idle_font"
-"selected_idle_foreground"
-"selected_idle_italic"
-"selected_idle_justify"
-"selected_idle_language"
-"selected_idle_layout"
-"selected_idle_left_bar"
-"selected_idle_left_gutter"
-"selected_idle_left_margin"
-"selected_idle_left_padding"
-"selected_idle_line_spacing"
-"selected_idle_min_width"
-"selected_idle_minwidth"
-"selected_idle_mouse"
-"selected_idle_offset"
-"selected_idle_outlines"
-"selected_idle_pos"
-"selected_idle_radius"
-"selected_idle_rest_indent"
-"selected_idle_right_bar"
-"selected_idle_right_gutter"
-"selected_idle_right_margin"
-"selected_idle_right_padding"
-"selected_idle_rotate"
-"selected_idle_rotate_pad"
-"selected_idle_size"
-"selected_idle_size_group"
-"selected_idle_slow_abortable"
-"selected_idle_slow_cps"
-"selected_idle_slow_cps_multiplier"
-"selected_idle_sound"
-"selected_idle_spacing"
-"selected_idle_subpixel"
-"selected_idle_text_align"
-"selected_idle_text_y_fudge"
-"selected_idle_thumb"
-"selected_idle_thumb_offset"
-"selected_idle_thumb_shadow"
-"selected_idle_top_bar"
-"selected_idle_top_gutter"
-"selected_idle_top_margin"
-"selected_idle_top_padding"
-"selected_idle_underline"
-"selected_idle_unscrollable"
-"selected_idle_xalign"
-"selected_idle_xanchor"
-"selected_idle_xanchoraround"
-"selected_idle_xaround"
-"selected_idle_xfill"
-"selected_idle_xmargin"
-"selected_idle_xmaximum"
-"selected_idle_xminimum"
-"selected_idle_xoffset"
-"selected_idle_xpadding"
-"selected_idle_xpos"
-"selected_idle_xzoom"
-"selected_idle_yalign"
-"selected_idle_yanchor"
-"selected_idle_yanchoraround"
-"selected_idle_yaround"
-"selected_idle_yfill"
-"selected_idle_ymargin"
-"selected_idle_ymaximum"
-"selected_idle_yminimum"
-"selected_idle_yoffset"
-"selected_idle_ypadding"
-"selected_idle_ypos"
-"selected_idle_yzoom"
-"selected_idle_zoom"
-"selected_insensitive_align"
-"selected_insensitive_alignaround"
-"selected_insensitive_alpha"
-"selected_insensitive_anchor"
-"selected_insensitive_angle"
-"selected_insensitive_antialias"
-"selected_insensitive_area"
-"selected_insensitive_around"
-"selected_insensitive_background"
-"selected_insensitive_bar_invert"
-"selected_insensitive_bar_resizing"
-"selected_insensitive_bar_vertical"
-"selected_insensitive_black_color"
-"selected_insensitive_bold"
-"selected_insensitive_bottom_bar"
-"selected_insensitive_bottom_gutter"
-"selected_insensitive_bottom_margin"
-"selected_insensitive_bottom_padding"
-"selected_insensitive_box_layout"
-"selected_insensitive_clipping"
-"selected_insensitive_color"
-"selected_insensitive_corner1"
-"selected_insensitive_corner2"
-"selected_insensitive_crop"
-"selected_insensitive_delay"
-"selected_insensitive_drop_shadow"
-"selected_insensitive_drop_shadow_color"
-"selected_insensitive_first_indent"
-"selected_insensitive_first_spacing"
-"selected_insensitive_fit_first"
-"selected_insensitive_font"
-"selected_insensitive_foreground"
-"selected_insensitive_italic"
-"selected_insensitive_justify"
-"selected_insensitive_language"
-"selected_insensitive_layout"
-"selected_insensitive_left_bar"
-"selected_insensitive_left_gutter"
-"selected_insensitive_left_margin"
-"selected_insensitive_left_padding"
-"selected_insensitive_line_spacing"
-"selected_insensitive_min_width"
-"selected_insensitive_minwidth"
-"selected_insensitive_mouse"
-"selected_insensitive_offset"
-"selected_insensitive_outlines"
-"selected_insensitive_pos"
-"selected_insensitive_radius"
-"selected_insensitive_rest_indent"
-"selected_insensitive_right_bar"
-"selected_insensitive_right_gutter"
-"selected_insensitive_right_margin"
-"selected_insensitive_right_padding"
-"selected_insensitive_rotate"
-"selected_insensitive_rotate_pad"
-"selected_insensitive_size"
-"selected_insensitive_size_group"
-"selected_insensitive_slow_abortable"
-"selected_insensitive_slow_cps"
-"selected_insensitive_slow_cps_multiplier"
-"selected_insensitive_sound"
-"selected_insensitive_spacing"
-"selected_insensitive_subpixel"
-"selected_insensitive_text_align"
-"selected_insensitive_text_y_fudge"
-"selected_insensitive_thumb"
-"selected_insensitive_thumb_offset"
-"selected_insensitive_thumb_shadow"
-"selected_insensitive_top_bar"
-"selected_insensitive_top_gutter"
-"selected_insensitive_top_margin"
-"selected_insensitive_top_padding"
-"selected_insensitive_underline"
-"selected_insensitive_unscrollable"
-"selected_insensitive_xalign"
-"selected_insensitive_xanchor"
-"selected_insensitive_xanchoraround"
-"selected_insensitive_xaround"
-"selected_insensitive_xfill"
-"selected_insensitive_xmargin"
-"selected_insensitive_xmaximum"
-"selected_insensitive_xminimum"
-"selected_insensitive_xoffset"
-"selected_insensitive_xpadding"
-"selected_insensitive_xpos"
-"selected_insensitive_xzoom"
-"selected_insensitive_yalign"
-"selected_insensitive_yanchor"
-"selected_insensitive_yanchoraround"
-"selected_insensitive_yaround"
-"selected_insensitive_yfill"
-"selected_insensitive_ymargin"
-"selected_insensitive_ymaximum"
-"selected_insensitive_yminimum"
-"selected_insensitive_yoffset"
-"selected_insensitive_ypadding"
-"selected_insensitive_ypos"
-"selected_insensitive_yzoom"
-"selected_insensitive_zoom"
-"selected_italic"
-"selected_justify"
-"selected_language"
-"selected_layout"
-"selected_left_bar"
-"selected_left_gutter"
-"selected_left_margin"
-"selected_left_padding"
-"selected_line_spacing"
-"selected_min_width"
-"selected_minwidth"
-"selected_mouse"
-"selected_offset"
-"selected_outlines"
-"selected_pos"
-"selected_radius"
-"selected_rest_indent"
-"selected_right_bar"
-"selected_right_gutter"
-"selected_right_margin"
-"selected_right_padding"
-"selected_rotate"
-"selected_rotate_pad"
-"selected_size"
-"selected_size_group"
-"selected_slow_abortable"
-"selected_slow_cps"
-"selected_slow_cps_multiplier"
-"selected_sound"
-"selected_spacing"
-"selected_subpixel"
-"selected_text_align"
-"selected_text_y_fudge"
-"selected_thumb"
-"selected_thumb_offset"
-"selected_thumb_shadow"
-"selected_top_bar"
-"selected_top_gutter"
-"selected_top_margin"
-"selected_top_padding"
-"selected_underline"
-"selected_unscrollable"
-"selected_xalign"
-"selected_xanchor"
-"selected_xanchoraround"
-"selected_xaround"
-"selected_xfill"
-"selected_xmargin"
-"selected_xmaximum"
-"selected_xminimum"
-"selected_xoffset"
-"selected_xpadding"
-"selected_xpos"
-"selected_xzoom"
-"selected_yalign"
-"selected_yanchor"
-"selected_yanchoraround"
-"selected_yaround"
-"selected_yfill"
-"selected_ymargin"
-"selected_ymaximum"
-"selected_yminimum"
-"selected_yoffset"
-"selected_ypadding"
-"selected_ypos"
-"selected_yzoom"
-"selected_zoom"
-"size"
-"size_group"
-"slow"
-"slow_abortable"
-"slow_cps"
-"slow_cps_multiplier"
-"sound"
-"spacing"
-"style"
-"style_group"
-"subpixel"
-"suffix"
-"text_align"
-"text_style"
-"text_y_fudge"
-"thumb"
-"thumb_offset"
-"thumb_shadow"
-"top_bar"
-"top_gutter"
-"top_margin"
-"top_padding"
-"transpose"
-"underline"
-"unhovered"
-"unscrollable"
-"value"
-"width"
-"xadjustment"
-"xalign"
-"xanchor"
-"xanchoraround"
-"xaround"
-"xfill"
-"xmargin"
-"xmaximum"
-"xminimum"
-"xoffset"
-"xpadding"
-"xpos"
-"xzoom"
-"yadjustment"
-"yalign"
-"yanchor"
-"yanchoraround"
-"yaround"
-"yfill"
-"ymargin"
-"ymaximum"
-"yminimum"
-"yoffset"
-"ypadding"
-"ypos"
-"yzoom"
-"zoom"
-          )) symbol-end)
+	  ;; Python 2.7.
+	  "bin" "bytearray" "bytes" "format" "memoryview" "next" "print"))
+	  symbol-end)
      (1 font-lock-builtin-face))
     (,(rx symbol-start (or
 	  ;; other built-ins
 	  "True" "False" "None" "Ellipsis"
-	  "_" "__debug__" "__doc__" "__import__" "__name__") symbol-end)
-     . font-lock-builtin-face)))
+	  "_" "__debug__" "__doc__" "__import__" "__name__" "__package__")
+	  symbol-end)
+     . font-lock-builtin-face)
+    ;; Ren'Py 8.0.3
+    (,(renpy-rx (group label-keyword) (1+ space) (group name))
+     (1 font-lock-keyword-face) (2 font-lock-function-name-face))
+    (,(renpy-rx (group screen-keyword) (1+ space) (group name))
+     (1 font-lock-keyword-face) (2 font-lock-function-name-face))
+    (,(renpy-rx (group style-keyword) (1+ space) (group name))
+     (1 font-lock-keyword-face) (2 font-lock-variable-name-face))
+    (,(renpy-rx (group transform-keyword) (1+ space) (group name))
+     (1 font-lock-keyword-face) (2 font-lock-function-name-face))
+    (,(renpy-rx (group image-keyword) (1+ space) (group image-name))
+     (1 font-lock-keyword-face) (2 font-lock-variable-name-face)
+     ;; Anchored match for attribute names.
+     (,(renpy-rx (group image-name))
+      (save-excursion
+	(search-forward-regexp "=" (line-end-position) t))
+      nil
+      (0 font-lock-preprocessor-face)))
+    (,(renpy-rx default-or-define-keyword)
+     (0 font-lock-keyword-face)
+     ;; Anchored match for anything that looks like a valid name.
+     (,(renpy-rx name)
+      (save-excursion
+	(search-forward-regexp "=" (line-end-position) t))
+      nil
+      (0 font-lock-variable-name-face)))
+    (,(renpy-rx init-keyword)
+     (0 font-lock-keyword-face)
+     ;; Anchored match for what may follow an init keyword.
+     (,(renpy-rx init-argument)
+      (save-excursion
+	(search-forward-regexp "=" (line-end-position) t))
+      nil
+      (0 font-lock-keyword-face)))
+    ;; Properties passed to a scrollbar.
+    (,(renpy-rx style-prefix-scrollbar
+		(optional style-prefix)
+		(or style-bar style-position transform-property))
+     . font-lock-type-face)
+    ;; Properties passed to a side.
+    (,(renpy-rx style-prefix-side
+		(optional style-prefix)
+		(or style-position transform-property))
+     . font-lock-type-face)
+    ;; Properties passed to a text displayable.
+    (,(renpy-rx style-prefix-text
+		(optional style-prefix)
+		(or style-position style-text transform-property))
+     . font-lock-type-face)
+    ;; Properties passed to a viewport.
+    (,(renpy-rx style-prefix-viewport
+		(optional style-prefix)
+		(or style-position transform-property))
+     . font-lock-type-face)
+    ;; All style properties with optional prefix.
+    (,(renpy-rx (optional style-prefix)
+		(or style-position style-text style-window
+		    style-button style-bar style-box style-grid
+		    style-fixed style-margin transform-property))
+     . font-lock-type-face)
+    (,(renpy-rx keyword)	    . font-lock-keyword-face)
+    (,(renpy-rx class-or-function)  . font-lock-builtin-face)
+    (,(renpy-rx ui-statement)	    . font-lock-builtin-face)
+    (,(renpy-rx transform-property) . font-lock-type-face)
+    (,(renpy-rx warper)		    . font-lock-constant-face)))
 
-(defconst renpy-font-lock-syntactic-keywords
+(defconst renpy-syntax-propertize-function
   ;; Make outer chars of matching triple-quote sequences into generic
   ;; string delimiters.  Fixme: Is there a better way?
   ;; First avoid a sequence preceded by an odd number of backslashes.
-  `((,(rx (not (any ?\\))
-	  ?\\ (* (and ?\\ ?\\))
-	  (group (syntax string-quote))
-	  (backref 1)
-	  (group (backref 1)))
-     (2 ,(string-to-syntax "\"")))	; dummy
-    (,(rx (group (optional (any "uUrR"))) ; prefix gets syntax property
-	  (optional (any "rR"))		  ; possible second prefix
-	  (group (syntax string-quote))   ; maybe gets property
-	  (backref 2)			  ; per first quote
-	  (group (backref 2)))		  ; maybe gets property
-     (1 (renpy-quote-syntax 1))
-     (2 (renpy-quote-syntax 2))
-     (3 (renpy-quote-syntax 3)))
-    ;; This doesn't really help.
-;;;     (,(rx (and ?\\ (group ?\n))) (1 " "))
-    ))
+  (syntax-propertize-rules
+   (;; Backrefs don't work in syntax-propertize-rules!
+    (concat "\\(?:\\([RUru]\\)[Rr]?\\|\\(?:\\=\\|[^\\]\\)\\(?:\\\\.\\)*\\)?" ;Prefix.
+	    "\\(?:\\('\\)'\\('\\)\\|\\(?2:\"\\)\"\\(?3:\"\\)\\)")
+    (3 (ignore (renpy-quote-syntax))))
+   ;; This doesn't really help.
+   ;;((rx (and ?\\ (group ?\n))) (1 " "))
+   ))
 
-(defun renpy-quote-syntax (n)
+(defun renpy-quote-syntax ()
   "Put `syntax-table' property correctly on triple quote.
 Used for syntactic keywords.  N is the match number (1, 2 or 3)."
   ;; Given a triple quote, we have to check the context to know
@@ -1309,28 +459,24 @@ Used for syntactic keywords.  N is the match number (1, 2 or 3)."
   ;; x '"""' x """ \"""" x
   (save-excursion
     (goto-char (match-beginning 0))
-    (cond
-     ;; Consider property for the last char if in a fenced string.
-     ((= n 3)
-      (let* ((font-lock-syntactic-keywords nil)
-	     (syntax (syntax-ppss)))
-	(when (eq t (nth 3 syntax))	; after unclosed fence
-	  (goto-char (nth 8 syntax))	; fence position
-	  (skip-chars-forward "uUrR")	; skip any prefix
-	  ;; Is it a matching sequence?
-	  (if (eq (char-after) (char-after (match-beginning 2)))
-	      (eval-when-compile (string-to-syntax "|"))))))
-     ;; Consider property for initial char, accounting for prefixes.
-     ((or (and (= n 2)			; leading quote (not prefix)
-	       (= (match-beginning 1) (match-end 1))) ; prefix is null
-	  (and (= n 1)			; prefix
-	       (/= (match-beginning 1) (match-end 1)))) ; non-empty
-      (let ((font-lock-syntactic-keywords nil))
-	(unless (eq 'string (syntax-ppss-context (syntax-ppss)))
-	  (eval-when-compile (string-to-syntax "|")))))
-     ;; Otherwise (we're in a non-matching string) the property is
-     ;; nil, which is OK.
-     )))
+    (let ((syntax (save-match-data (syntax-ppss))))
+      (cond
+       ((eq t (nth 3 syntax))           ; after unclosed fence
+	;; Consider property for the last char if in a fenced string.
+	(goto-char (nth 8 syntax))	; fence position
+	(skip-chars-forward "uUrR")	; skip any prefix
+	;; Is it a matching sequence?
+	(if (eq (char-after) (char-after (match-beginning 2)))
+	    (put-text-property (match-beginning 3) (match-end 3)
+			       'syntax-table (string-to-syntax "|"))))
+       ((match-end 1)
+	;; Consider property for initial char, accounting for prefixes.
+	(put-text-property (match-beginning 1) (match-end 1)
+			   'syntax-table (string-to-syntax "|")))
+       (t
+	;; Consider property for initial char, accounting for prefixes.
+	(put-text-property (match-beginning 2) (match-end 2)
+			   'syntax-table (string-to-syntax "|")))))))
 
 ;; This isn't currently in `font-lock-defaults' as probably not worth
 ;; it -- we basically only mess with a few normally-symbol characters.
@@ -1358,19 +504,15 @@ Used for syntactic keywords.  N is the match number (1, 2 or 3)."
 (defvar renpy-mode-map
   (let ((map (make-sparse-keymap)))
     ;; Mostly taken from renpy-mode.el.
-    (define-key map ":" 'renpy-electric-colon)
-    (define-key map "\177" 'renpy-backspace)
-    (define-key map "\C-c<" 'renpy-shift-left)
-    (define-key map "\C-c>" 'renpy-shift-right)
-    (define-key map "\C-c\C-k" 'renpy-mark-block)
-    (define-key map "\C-c\C-n" 'renpy-next-statement)
-    (define-key map "\C-c\C-p" 'renpy-previous-statement)
-    (define-key map "\C-c\C-u" 'renpy-beginning-of-block)
-    (define-key map "\C-c\C-f" 'renpy-describe-symbol)
-    (define-key map "\C-c\C-w" 'renpy-check)
-    (define-key map "\C-c\C-v" 'renpy-check) ; a la sgml-mode
-    (substitute-key-definition 'complete-symbol 'symbol-complete
-			       map global-map)
+    (define-key map ":" #'renpy-electric-colon)
+    (define-key map "\177" #'renpy-backspace)
+    (define-key map "\C-c<" #'renpy-shift-left)
+    (define-key map "\C-c>" #'renpy-shift-right)
+    (define-key map "\C-c\C-k" #'renpy-mark-block)
+    (define-key map "\C-c\C-j" #'imenu)
+    (define-key map "\C-c\C-n" #'renpy-next-statement)
+    (define-key map "\C-c\C-p" #'renpy-previous-statement)
+    (define-key map "\C-c\C-u" #'renpy-beginning-of-block)
     (easy-menu-define renpy-menu map "Ren'Py Mode menu"
       `("Ren'Py"
 	:help "Ren'Py-specific Features"
@@ -1381,11 +523,17 @@ Used for syntactic keywords.  N is the match number (1, 2 or 3)."
 	"-"
 	["Mark block" renpy-mark-block
 	 :help "Mark innermost block around point"]
+	["Mark def/class" mark-defun
+	 :help "Mark innermost definition around point"]
+	"-"
 	["Start of block" renpy-beginning-of-block
 	 :help "Go to start of innermost definition around point"]
 	["End of block" renpy-end-of-block
 	 :help "Go to end of innermost definition around point"]
-        ))
+	["Start of def/class" beginning-of-defun
+	 :help "Go to start of innermost definition around point"]
+	["End of def/class" end-of-defun
+	 :help "Go to end of innermost definition around point"]))
     map))
 
 ;; Fixme: add toolbar stuff for useful things like symbol help, send
@@ -1486,17 +634,15 @@ Do nothing if not in string."
 
 (defun renpy-open-block-statement-p (&optional bos)
   "Return non-nil if statement at point opens a block.
-BOS non-nil means point is known to be at beginning of statement."
+Any statement that ends in a colon opens a block.  BOS non-nil
+means point is known to be at beginning of statement."
   (save-excursion
     (unless bos (renpy-beginning-of-statement))
-
-    ; A statement opens a block if it ends with :.
-    (renpy-end-of-statement)
-    (equal (char-before) 58)))
-
-    ;; (looking-at (rx (and (or "if" "else" "elif" "while" "for" "def"
-    ;;     		     "class" "try" "except" "finally" "with")
-    ;;     		 symbol-end)))))
+    (and (< (point) (progn
+		      (renpy-end-of-statement)
+		      (renpy-skip-comments-blanks t)
+		      (point)))
+	 (eq ?: (char-before)))))
 
 (defun renpy-close-block-statement-p (&optional bos)
   "Return non-nil if current line is a statement closing a block.
@@ -1562,8 +708,6 @@ statement."
   :group 'renpy
   :type 'integer)
 
-
-
 (defun renpy-guess-indent ()
   "Guess step for indentation of current buffer.
 Set `renpy-indent' locally to the value guessed."
@@ -1588,7 +732,7 @@ Set `renpy-indent' locally to the value guessed."
 		    (setq done t))))))
 	(when done
 	  (when (/= indent (default-value 'renpy-indent))
-	    (set (make-local-variable 'renpy-indent) indent)
+	    (setq-local renpy-indent indent)
 	    (unless (= tab-width renpy-indent)
 	      (setq indent-tabs-mode nil)))
 	  indent)))))
@@ -1614,21 +758,34 @@ Set `renpy-indent' locally to the value guessed."
 	  start)
       (cond
        ((eq 'string (syntax-ppss-context syntax)) ; multi-line string
-	(if (not renpy-indent-string-contents)
-	    (current-indentation)
-	  ;; Only respect `renpy-indent-string-contents' in doc
-	  ;; strings (defined as those which form statements).
-	  (if (not (save-excursion
-		     (renpy-beginning-of-statement)
-		     (looking-at (rx (or (syntax string-delimiter)
-					 (syntax string-quote))))))
-	      (current-indentation)
-	    ;; Find indentation of preceding non-blank line within string.
-	    (setq start (nth 8 syntax))
-	    (forward-line -1)
-	    (while (and (< start (point)) (looking-at "\\s-*$"))
-	      (forward-line -1))
-	    (current-indentation))))
+	(cond
+	 ;; Indentation for Ren'Py dialogue strings, which are allowed to
+	 ;; span multiple lines.
+	 ;; FIXME: Should this be a user preference?
+	 ((renpy-in-script-statement-p)
+	  (goto-char (nth 8 syntax))
+	  (+ (current-column) (if (eq (skip-syntax-forward "|\"") 1)
+				  ;; Align with the inside of a single quote.
+				  1
+				;; No adjustment for a triple quote.
+				;; FIXME: Should this be a user preference?
+				0)))
+	 ((not renpy-indent-string-contents)
+	  (current-indentation))
+	 ;; Only respect `renpy-indent-string-contents' in doc
+	 ;; strings (defined as those which form statements).
+	 ((not (save-excursion
+		 (renpy-beginning-of-statement)
+		 (looking-at (rx (or (syntax string-delimiter)
+				     (syntax string-quote))))))
+	  (current-indentation))
+	 (t
+	  ;; Find indentation of preceding non-blank line within string.
+	  (setq start (nth 8 syntax))
+	  (forward-line -1)
+	  (while (and (< start (point)) (looking-at "\\s-*$"))
+	    (forward-line -1))
+	  (current-indentation))))
        ((renpy-continuation-line-p)   ; after backslash, or bracketed
 	(let ((point (point))
 	      (open-start (cadr syntax))
@@ -1708,7 +865,7 @@ Set `renpy-indent' locally to the value guessed."
 			   (list elt))))))
 	(caar (last renpy-indent-list)))))))
 
-;;;; Cycling through the possible indentations with successive TABs.
+;; Cycling through the possible indentations with successive TABs.
 
 ;; These don't need to be buffer-local since they're only relevant
 ;; during a cycle.
@@ -1719,16 +876,17 @@ Set `renpy-indent' locally to the value guessed."
     (buffer-substring (progn
 			(back-to-indentation)
 			(point))
-		      (progn
-			(end-of-line)
-			(forward-comment -1)
-			(point)))))
+		      (max (point)
+			   (progn
+			     (end-of-line)
+			     (renpy-skip-comments-blanks t)
+			     (point))))))
 
 (defconst renpy-block-pairs
-  '(("else" "if" "elif" "while" "for" "try" "except")
-    ("elif" "if" "elif")
+  '(("else" "if" "showif" "elif" "while" "for" "try" "except")
+    ("elif" "if" "showif" "elif")
     ("except" "try" "except")
-    ("finally" "try" "except"))
+    ("finally" "else" "try" "except"))
   "Alist of keyword matches.
 The car of an element is a keyword introducing a statement which
 can close a block opened by a keyword in the cdr.")
@@ -1819,7 +977,7 @@ indentation if it is valid, i.e. one of the positions returned by
       (if (> (- (point-max) pos) (point))
 	  (goto-char (- (point-max) pos))))))
 
-(defun renpy-indent-line-2 ()
+(defun renpy-indent-line ()
   "Indent current line as Renpy code.
 When invoked via `indent-for-tab-command', cycle through possible
 indentations for current line.  The cycle is broken by a command
@@ -1845,8 +1003,9 @@ the cycling."
 
 (defun renpy-indent-region (start end)
   "`indent-region-function' for Renpy.
-Leaves validly-indented lines alone, i.e. doesn't indent to
-another valid position."
+START and END specify the region to indent.  Validly-indented
+lines are left alone, i.e. they are not indented to another valid
+position."
   (save-excursion
     (goto-char end)
     (setq end (point-marker))
@@ -1859,8 +1018,9 @@ another valid position."
     (move-marker end nil)))
 
 (defun renpy-block-end-p ()
-  "Non-nil if this is a line in a statement closing a block,
-or a blank line indented to where it would close a block."
+  "Return a non-nil when the current line closes a block.
+A block can be clsoed by a statement closing a block, or by a
+blank line indented to where it would close a block."
   (and (not (renpy-comment-line-p))
        (or (renpy-close-block-statement-p t)
 	   (< (current-indentation)
@@ -1953,32 +1113,24 @@ Finds end of innermost nested class or method definition."
 	(goto-char (point-max)))))
 
 (defun renpy-beginning-of-statement ()
-  "Go to start of current statement.
+  "Go to the start of current statement and return point.
 Accounts for continuation lines, multi-line strings, and
 multi-line bracketed expressions."
-  (beginning-of-line)
-  (renpy-beginning-of-string)
-  (let (point)
-    (while (and (renpy-continuation-line-p)
-		(if point
-		    (< (point) point)
-		  t))
-      (beginning-of-line)
+  (while
       (if (renpy-backslash-continuation-line-p)
-	  (progn
-	    (forward-line -1)
-	    (while (renpy-backslash-continuation-line-p)
-	      (forward-line -1)))
-	(renpy-beginning-of-string)
-	(renpy-skip-out))
-      (setq point (point))))
-  (back-to-indentation))
+	  (progn (forward-line -1) t)
+	(beginning-of-line)
+	(or (renpy-beginning-of-string)
+	    (renpy-skip-out))))
+  (back-to-indentation)
+  (point))
 
 (defun renpy-skip-out (&optional forward syntax)
   "Skip out of any nested brackets.
 Skip forward if FORWARD is non-nil, else backward.
 If SYNTAX is non-nil it is the state returned by `syntax-ppss' at point.
 Return non-nil if and only if skipping was done."
+  ;; FIXME: Use syntax-ppss-toplevel-pos.
   (let ((depth (syntax-ppss-depth (or syntax (syntax-ppss))))
 	(forward (if forward -1 1)))
     (unless (zerop depth)
@@ -2011,18 +1163,19 @@ On a comment line, go to end of line."
 			   nil)
 			  ((eq 'string (syntax-ppss-context s))
 			   ;; Go to start of string and skip it.
-                           (let ((pos (point)))
-                             (goto-char (nth 8 s))
-                             (condition-case () ; beware invalid syntax
-                                 (progn (forward-sexp) t)
-                               ;; If there's a mismatched string, make sure
-                               ;; we still overall move *forward*.
-                               (error (goto-char pos) (end-of-line)))))
+			   (let ((pos (point)))
+			     (goto-char (nth 8 s))
+			     (condition-case () ; beware invalid syntax
+				 (progn (forward-sexp) t)
+			       ;; If there's a mismatched string, make sure
+			       ;; we still overall move *forward*.
+			       (error (goto-char pos) (end-of-line)))))
 			  ((renpy-skip-out t s))))
 	     (end-of-line))
-	   (unless comment
-	     (eq ?\\ (char-before))))	; Line continued?
-    (end-of-line 2))			; Try next line.
+	   (and (not comment)
+		(not (eobp))
+		(eq ?\\ (char-before)))) ; Line continued?
+    (end-of-line 2))			 ; Try next line.
   (point))
 
 (defun renpy-previous-statement (&optional count)
@@ -2082,12 +1235,12 @@ Otherwise return non-nil."
 	    (not (goto-char point))	; return nil
 	  ;; Look upwards for less indented statement.
 	  (if (catch 'done
-;;; This is slower than the below.
-;;; 	  (while (zerop (renpy-previous-statement))
-;;; 	    (when (and (< (current-indentation) ci)
-;;; 		       (renpy-open-block-statement-p t))
-;;; 	      (beginning-of-line)
-;;; 	      (throw 'done t)))
+;; This is slower than the below.
+;; 	  (while (zerop (renpy-previous-statement))
+;; 	    (when (and (< (current-indentation) ci)
+;; 		       (renpy-open-block-statement-p t))
+;; 	      (beginning-of-line)
+;; 	      (throw 'done t)))
 		(while (and (zerop (forward-line -1)))
 		  (when (and (< (current-indentation) ci)
 			     (not (renpy-comment-line-p))
@@ -2128,30 +1281,32 @@ don't move and return nil.  Otherwise return t."
       (setq arg (1- arg)))
     (zerop arg)))
 
+(defun renpy-in-script-statement-p ()
+  "Return a non-nil value when point is within the main game script."
+  (save-excursion
+    (or (null (renpy-beginning-of-block))
+	(looking-at-p (renpy-rx label-keyword)))))
+
 (defvar renpy-which-func-length-limit 40
   "Non-strict length limit for `renpy-which-func' output.")
 
 (defun renpy-which-func ()
+  "Return the name of the function which surrounds point."
   (let ((function-name (renpy-current-defun renpy-which-func-length-limit)))
     (set-text-properties 0 (length function-name) nil function-name)
     function-name))
-
 
 ;;;; Imenu.
 
-;; For possibily speeding this up, here's the top of the ELP profile
-;; for rescanning pydoc.py (2.2k lines, 90kb):
-;; Function Name                         Call Count  Elapsed Time  Average Time
-;; ====================================  ==========  =============  ============
-;; renpy-imenu-create-index             156         2.430906      0.0155827307
-;; renpy-end-of-defun                   155         1.2718260000  0.0082053290
-;; renpy-end-of-block                   155         1.1898689999  0.0076765741
-;; renpy-next-statement                 2970        1.024717      0.0003450225
-;; renpy-end-of-statement               2970        0.4332190000  0.0001458649
-;; renpy-beginning-of-defun             265         0.0918479999  0.0003465962
-;; renpy-skip-comments-blanks           3125        0.0753319999  2.410...e-05
-
-(defvar renpy-recursing)
+(defvar renpy-generic-imenu
+  `((nil ,(renpy-rx label-keyword (1+ space) (group name)) 1)
+    ("/class" ,(renpy-rx symbol-start "class" (1+ space) (group name)) 1)
+    ("/function" ,(renpy-rx symbol-start "def" (1+ space) (group name)) 1)
+    ("/image" ,(renpy-rx image-keyword (1+ space) (group name)) 1)
+    ("/screen" ,(renpy-rx screen-keyword (1+ space) (group name)) 1)
+    ("/style" ,(renpy-rx style-keyword (1+ space) (group name)) 1)
+    ("/transform" ,(renpy-rx transform-keyword (1+ space) (group name)) 1)))
+
 ;;;; `Electric' commands.
 
 (defun renpy-electric-colon (arg)
@@ -2196,69 +1351,90 @@ Repeat ARG times."
       (indent-to indent))))
 (put 'renpy-backspace 'delete-selection 'supersede)
 
-(defun renpy-fill-paragraph-2 (&optional justify)
+(defun renpy-fill-paragraph (&optional justify)
   "`fill-paragraph-function' handling multi-line strings and possibly comments.
-If any of the current line is in or at the end of a multi-line string,
-fill the string or the paragraph of it that point is in, preserving
-the string's indentation."
+
+For Ren'Py dialogue, if point is within a string, fill the string
+with a prefix which aligns with the string indentation position.
+
+Otherwise, if any of the current line is in or at the end of a
+multi-line string, fill the string or the paragraph of it that
+point is in, preserving the string's indentation.
+
+If JUSTIFY is non-nil, justify as well."
   (interactive "P")
-  (or (fill-comment-paragraph justify)
-      (save-excursion
-	(end-of-line)
-	(let* ((syntax (syntax-ppss))
-	       (orig (point))
-	       start end)
-	  (cond ((nth 4 syntax)	; comment.   fixme: loses with trailing one
-		 (let (fill-paragraph-function)
-		   (fill-paragraph justify)))
-		;; The `paragraph-start' and `paragraph-separate'
-		;; variables don't allow us to delimit the last
-		;; paragraph in a multi-line string properly, so narrow
-		;; to the string and then fill around (the end of) the
-		;; current line.
-		((eq t (nth 3 syntax))	; in fenced string
-		 (goto-char (nth 8 syntax)) ; string start
-		 (setq start (line-beginning-position))
-		 (setq end (condition-case () ; for unbalanced quotes
-                               (progn (forward-sexp)
-                                      (- (point) 3))
-                             (error (point-max)))))
-		((re-search-backward "\\s|\\s-*\\=" nil t) ; end of fenced string
-		 (forward-char)
-		 (setq end (point))
-		 (condition-case ()
-		     (progn (backward-sexp)
-			    (setq start (line-beginning-position)))
-		   (error nil))))
-	  (when end
-	    (save-restriction
-	      (narrow-to-region start end)
-	      (goto-char orig)
-	      ;; Avoid losing leading and trailing newlines in doc
-	      ;; strings written like:
-	      ;;   """
-	      ;;   ...
-	      ;;   """
-	      (let ((paragraph-separate
-		     ;; Note that the string could be part of an
-		     ;; expression, so it can have preceding and
-		     ;; trailing non-whitespace.
-		     (concat
-		      (rx (or
-			   ;; Opening triple quote without following text.
-			   (and (* nonl)
-				(group (syntax string-delimiter))
-				(repeat 2 (backref 1))
-				;; Fixme:  Not sure about including
-				;; trailing whitespace.
-				(* (any " \t"))
-				eol)
-			   ;; Closing trailing quote without preceding text.
-			   (and (group (any ?\" ?')) (backref 2)
-				(syntax string-delimiter))))
-		      "\\(?:" paragraph-separate "\\)"))
-		    fill-paragraph-function)
-		(fill-paragraph justify))))))) t)
+  (cond
+   ((fill-comment-paragraph justify))
+   ;; Ren'Py dialogue.
+   ((and (renpy-in-script-statement-p)
+	 (let ((syntax (syntax-ppss)))
+	   (when (nth 3 syntax)
+	     (save-excursion
+	       (goto-char (nth 8 syntax))
+	       ;; Check this is a single quoted string.	 For triple-quoted
+	       ;; strings the python docstring filling should be fine.
+	       (when (eq (skip-syntax-forward "|\"") 1)
+		 (let ((fill-prefix (make-string (current-column) ?\s))
+		       fill-paragraph-function)
+		   (fill-paragraph justify))))))))
+   ;; Original Python.
+   (t
+    (save-excursion
+      (end-of-line)
+      (let* ((syntax (syntax-ppss))
+	     (orig (point))
+	     start end)
+	(cond ((nth 4 syntax)	; comment.   fixme: loses with trailing one
+	       (let (fill-paragraph-function)
+		 (fill-paragraph justify)))
+	      ;; The `paragraph-start' and `paragraph-separate'
+	      ;; variables don't allow us to delimit the last
+	      ;; paragraph in a multi-line string properly, so narrow
+	      ;; to the string and then fill around (the end of) the
+	      ;; current line.
+	      ((nth 3 syntax)	; in fenced string
+	       (goto-char (nth 8 syntax)) ; string start
+	       (setq start (line-beginning-position))
+	       (setq end (condition-case () ; for unbalanced quotes
+			     (progn (forward-sexp)
+				    (- (point) 3))
+			   (error (point-max)))))
+	      ((re-search-backward "\\s|\\s-*\\=" nil t) ; end of fenced string
+	       (forward-char)
+	       (setq end (point))
+	       (condition-case ()
+		   (progn (backward-sexp)
+			  (setq start (line-beginning-position)))
+		 (error nil))))
+	(when end
+	  (save-restriction
+	    (narrow-to-region start end)
+	    (goto-char orig)
+	    ;; Avoid losing leading and trailing newlines in doc
+	    ;; strings written like:
+	    ;;   """
+	    ;;   ...
+	    ;;   """
+	    (let ((paragraph-separate
+		   ;; Note that the string could be part of an
+		   ;; expression, so it can have preceding and
+		   ;; trailing non-whitespace.
+		   (concat
+		    (rx (or
+			 ;; Opening triple quote without following text.
+			 (and (* nonl)
+			      (group (syntax string-delimiter))
+			      (repeat 2 (backref 1))
+			      ;; Fixme:  Not sure about including
+			      ;; trailing whitespace.
+			      (* (any " \t"))
+			      eol)
+			 ;; Closing trailing quote without preceding text.
+			 (and (group (any ?\" ?')) (backref 2)
+			      (syntax string-delimiter))))
+		    "\\(?:" paragraph-separate "\\)"))
+		  fill-paragraph-function)
+	      (fill-paragraph justify)))))))))
 
 (defun renpy-shift-left (start end &optional count)
   "Shift lines in region COUNT (the prefix arg) columns to the left.
@@ -2300,14 +1476,17 @@ END lie."
   (indent-rigidly start end count))
 
 (defun renpy-outline-level ()
-  "`outline-level' function for Renpy mode.
+  "Return the `outline-mode' level.
 The level is the number of `renpy-indent' steps of indentation
-of current line."
-  (1+ (/ (current-indentation) renpy-indent)))
+of current statement."
+  (save-excursion
+    (renpy-beginning-of-statement)
+    (1+ (/ (current-indentation) renpy-indent))))
 
 ;; Fixme: Consider top-level assignments, imports, &c.
 (defun renpy-current-defun (&optional length-limit)
-  "`add-log-current-defun-function' for Renpy."
+  "Return the name of the current function.
+Ignore names which are longer than LENGTH-LIMIT."
   (save-excursion
     ;; Move up the tree of nested `class' and `def' blocks until we
     ;; get to zero indentation, accumulating the defined names.
@@ -2343,18 +1522,11 @@ Uses `renpy-beginning-of-block', `renpy-end-of-block'."
   (push-mark (point) nil t)
   (renpy-end-of-block)
   (exchange-point-and-mark))
-
+
 ;;;; Modes.
 
-;; pdb tracking is alert once this file is loaded, but takes no action if
-;; `renpy-pdbtrack-do-tracking-p' is nil.
-
-(defvar outline-heading-end-regexp)
-(defvar eldoc-documentation-function)
-(defvar renpy-mode-running)            ;Dynamically scoped var.
-
 ;;;###autoload
-(define-derived-mode renpy-mode fundamental-mode "Ren'Py"
+(define-derived-mode renpy-mode prog-mode "Ren'Py"
   "Major mode for editing Renpy files.
 Turns on Font Lock mode unconditionally since it is currently required
 for correct parsing of the source.
@@ -2390,76 +1562,39 @@ with skeleton expansions for compound statement templates.
 
 \\{renpy-mode-map}"
   :group 'renpy
-  (set (make-local-variable 'font-lock-defaults)
-       '(renpy-font-lock-keywords nil nil nil nil
-				   (font-lock-syntactic-keywords
-				    . renpy-font-lock-syntactic-keywords)
-				   ;; This probably isn't worth it.
-				   ;; (font-lock-syntactic-face-function
-				   ;;  . renpy-font-lock-syntactic-face-function)
-				   ))
-  (set (make-local-variable 'parse-sexp-lookup-properties) t)
-  (set (make-local-variable 'parse-sexp-ignore-comments) t)
-  (set (make-local-variable 'comment-start) "# ")
-  (set (make-local-variable 'indent-line-function) #'renpy-indent-line)
-  (set (make-local-variable 'indent-region-function) #'renpy-indent-region)
-  (set (make-local-variable 'paragraph-start) "\\s-*$")
-  (set (make-local-variable 'fill-paragraph-function) 'renpy-fill-paragraph)
-  (set (make-local-variable 'require-final-newline) mode-require-final-newline)
-  (set (make-local-variable 'add-log-current-defun-function)
-       #'renpy-current-defun)
-  (set (make-local-variable 'outline-regexp)
-       (rx (* space) (or "class" "def" "elif" "else" "except" "finally"
-			 "for" "if" "try" "while" "with")
-	   symbol-end))
-  (set (make-local-variable 'outline-heading-end-regexp) ":\\s-*\n")
-  (set (make-local-variable 'outline-level) #'renpy-outline-level)
-  (set (make-local-variable 'open-paren-in-column-0-is-defun-start) nil)
-  (make-local-variable 'renpy-saved-check-command)
-  (set (make-local-variable 'beginning-of-defun-function)
-       'renpy-beginning-of-defun)
-  (set (make-local-variable 'end-of-defun-function) 'renpy-end-of-defun)
+  (setq-local font-lock-defaults
+	      '(renpy-font-lock-keywords
+		nil nil nil nil
+		;; This probably isn't worth it.
+		;; (font-lock-syntactic-face-function
+		;;  . renpy-font-lock-syntactic-face-function)
+		))
+  (setq-local syntax-propertize-function renpy-syntax-propertize-function)
+  (setq-local parse-sexp-lookup-properties t)
+  (setq-local parse-sexp-ignore-comments t)
+  (setq-local comment-start "#")
+  (setq-local indent-line-function #'renpy-indent-line)
+  (setq-local indent-region-function #'renpy-indent-region)
+  (setq-local paragraph-start "\\s-*$")
+  (setq-local fill-paragraph-function #'renpy-fill-paragraph)
+  (setq-local require-final-newline mode-require-final-newline)
+  (setq-local add-log-current-defun-function #'renpy-current-defun)
+  (setq-local outline-regexp
+	      (rx (1+ not-newline) ?: (0+ space) (or (syntax <) eol)))
+  (setq-local outline-level #'renpy-outline-level)
+  (setq-local open-paren-in-column-0-is-defun-start nil)
+  (setq-local beginning-of-defun-function #'renpy-beginning-of-defun)
+  (setq-local end-of-defun-function #'renpy-end-of-defun)
   (add-hook 'which-func-functions 'renpy-which-func nil t)
 
-  (setq imenu-create-index-function 'imenu-default-create-index-function)
+  (setq imenu-create-index-function #'imenu-default-create-index-function)
   (setq imenu-generic-expression renpy-generic-imenu)
-  
-  (set (make-local-variable 'eldoc-documentation-function)
-       #'renpy-eldoc-function)
-;;  (add-hook 'eldoc-mode-hook
-;;	    (lambda () (run-renpy nil t)) ; need it running
-;;	    nil t)
-  (set (make-local-variable 'symbol-completion-symbol-function)
-       'renpy-partial-symbol)
-  (set (make-local-variable 'symbol-completion-completions-function)
-       'renpy-symbol-completions)
-  ;; Fixme: should be in hideshow.  This seems to be of limited use
-  ;; since it isn't (can't be) indentation-based.  Also hide-level
-  ;; doesn't seem to work properly.
-  (add-to-list 'hs-special-modes-alist
-	       `(renpy-mode "^\\s-*\\(?:def\\|class\\)\\>" nil "#"
-		 ,(lambda (arg)
-		    (renpy-end-of-defun)
-		    (skip-chars-backward " \t\n"))
-		 nil))
-  (set (make-local-variable 'skeleton-further-elements)
-       '((< '(backward-delete-char-untabify (min renpy-indent
-						 (current-column))))
-	 (^ '(- (1+ (current-indentation))))))
-  ;; Let's not mess with hippie-expand.  Symbol-completion should rather be
-  ;; bound to another key, since it has different performance requirements.
-  ;; (if (featurep 'hippie-exp)
-  ;;     (set (make-local-variable 'hippie-expand-try-functions-list)
-  ;;          (cons 'symbol-completion-try-complete
-  ;;       	 hippie-expand-try-functions-list)))
-  ;; Renpy defines TABs as being 8-char wide.
-  (set (make-local-variable 'tab-width) 8)
-  (unless font-lock-mode (font-lock-mode 1))
+
+  ;; Inhibit `electric-indent-mode'.
+  (setq electric-indent-inhibit t)
+  ;; Setup indentation (Ren'Py cannot use tabs).
   (when renpy-guess-indent (renpy-guess-indent))
-  ;; Let's make it harder for the user to shoot himself in the foot.
-  (unless (= tab-width renpy-indent)
-    (setq indent-tabs-mode nil))
-  )
+  (setq indent-tabs-mode nil))
 
 ;; Not done automatically in Emacs 21 or 22.
 (defcustom renpy-mode-hook nil
@@ -2467,78 +1602,7 @@ with skeleton expansions for compound statement templates.
   :group 'renpy
   :type 'hook)
 (custom-add-option 'renpy-mode-hook 'imenu-add-menubar-index)
-(custom-add-option 'renpy-mode-hook
-		   (lambda ()
-		     "Turn off Indent Tabs mode."
-		     (setq indent-tabs-mode nil)))
-(custom-add-option 'renpy-mode-hook 'turn-on-eldoc-mode)
 (custom-add-option 'renpy-mode-hook 'abbrev-mode)
-(custom-add-option 'renpy-mode-hook 'renpy-setup-brm)
-
-
-(defun renpy-in-literal ()
-  (syntax-ppss-context (syntax-ppss)))
-
-; Indents a paragraph. We also handle strings properly.
-(defun renpy-fill-paragraph (&optional justify)
-  (interactive)
-  (if (eq (renpy-in-literal) 'string)
-      (let* ((string-indentation (renpy-string-indentation))
-             (fill-prefix (renpy-string-fill-prefix))
-             (fill-column (- fill-column string-indentation))
-             (fill-paragraph-function nil)
-             (indent-line-function nil)
-             )
-        
-        (message "fill prefix: %S" fill-prefix)
-
-        (renpy-fill-string (renpy-string-start))
-        t
-        )
-    (renpy-fill-paragraph-2 justify)
-    )   
-  )
-
-; Indents the current line. 
-(defun renpy-indent-line (&optional arg)
-  (interactive)
-
-  ; Let python-mode indent. (Always needed to keep python-mode sane.)
-  (renpy-indent-line-2)
-
-  ; Reindent strings if appropriate.
-  (save-excursion
-    (beginning-of-line)
-    (if (eq (renpy-in-literal) 'string)
-        (progn 
-          (delete-horizontal-space)
-          (indent-to (renpy-string-indentation))
-          )
-      ))
-
-  (if ( < (current-column) (current-indentation) )
-      (back-to-indentation) )
-
-  )
-
-
-; Computes the start of the current string.
-(defun renpy-string-start ()
-  (nth 8 (parse-partial-sexp (point-min) (point)))
-  )
-
-; Computes the amount of indentation needed to put the current string
-; in the right spot.
-(defun renpy-string-indentation () 
-  (+ 1
-     (save-excursion
-       (- (goto-char (renpy-string-start))
-          (progn (beginning-of-line) (point)))
-       )
-     )
-  )
-
-
 
 (provide 'renpy)
 
