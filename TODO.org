@@ -1,0 +1,55 @@
+* Testing
+
+- [ ] which-func tests
+
+- [ ] more imenu tests
+
+- [ ] movement tests
+
+- [ ] indentation tests
+
+- [ ] font-locking tests
+
+- [ ] automated testing with multiple emacs versions
+
+* Font lock
+
+- [ ] local label syntax highlight
+
+* Xref support
+
+- [ ] file-local symbol lookup
+
+- [ ] global symbol lookup
+
+- [ ] symbol reference search
+
+* Completion
+
+See https://github.com/renpy/vscode-language-renpy/blob/master/src/completion.ts for
+inspiration:
+
+- [ ] local/global label completion
+
+- [ ] keyword-specific completions
+
+* Integration
+
+- [ ] Ren'py launcher integration (see https://github.com/elizagamedev/renpy-mode)
+
+- [ ] Suggest for inclusion?
+
+* Document
+
+- [ ] Existing facilities
+
+- [ ] Launcher integration
+
+- [ ] Contribution
+
+
+* Publishing
+
+- [ ] rename to renpy-mode (also in Melpa)
+
+- [ ] reannounce the package (once enough features are ready)
