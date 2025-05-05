@@ -57,6 +57,12 @@
 		  (or alpha "_")
 		  (0+ (or alphanumeric "_"))
 		  symbol-end))
+	    (label-name
+	     (seq (optional ".")
+		  symbol-start
+		  (or alpha "_")
+		  (0+ (or alphanumeric "_"))
+		  symbol-end))
 	    (image-name
 	     (seq symbol-start
 		  (1+ (or alphanumeric "_"))
@@ -364,7 +370,7 @@
 	  symbol-end)
      . font-lock-builtin-face)
     ;; Ren'Py 8.0.3
-    (,(renpy-rx (group label-keyword) (1+ space) (group name))
+    (,(renpy-rx (group label-keyword) (1+ space) (group label-name))
      (1 font-lock-keyword-face) (2 font-lock-function-name-face))
     (,(renpy-rx (group screen-keyword) (1+ space) (group name))
      (1 font-lock-keyword-face) (2 font-lock-function-name-face))
@@ -1299,7 +1305,7 @@ don't move and return nil.  Otherwise return t."
 ;;;; Imenu.
 
 (defvar renpy-generic-imenu
-  `((nil ,(renpy-rx label-keyword (1+ space) (group name)) 1)
+  `((nil ,(renpy-rx label-keyword (1+ space) (group label-name)) 1)
     ("/class" ,(renpy-rx symbol-start "class" (1+ space) (group name)) 1)
     ("/function" ,(renpy-rx symbol-start "def" (1+ space) (group name)) 1)
     ("/image" ,(renpy-rx image-keyword (1+ space) (group name)) 1)
