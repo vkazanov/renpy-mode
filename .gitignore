@@ -1,0 +1,13 @@
+# Byte-code
+*.elc
+
+# Packaging
+.eask/
+
+# Distribution
+dist/
+
+# Eask might be installed within the project.
+node_modules/
+package-lock.json
+package.json
