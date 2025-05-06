@@ -83,10 +83,12 @@
 	    ;; Images.
 	    (image-keyword
 	     (seq line-start "image" symbol-end))
-	    ;; Define or default.  Allow indentation for use in explicit init
-	    ;; blocks or within a screen.
-	    (default-or-define-keyword
-	      (seq line-start (0+ space) (or "default" "define") symbol-end))
+	    ;; Define and default. Both allow indentation for use in explicit
+	    ;; init blocks or within a screen.
+	    (define-keyword
+	     (seq line-start (0+ space) "define" symbol-end))
+	    (default-keyword
+	     (seq line-start (0+ space) "default" symbol-end))
 	    ;; Init.
 	    (init-keyword
 	     (seq line-start "init" symbol-end))
@@ -386,7 +388,7 @@
 	(search-forward-regexp "=" (line-end-position) t))
       nil
       (0 font-lock-preprocessor-face)))
-    (,(renpy-rx default-or-define-keyword)
+    (,(renpy-rx (or default-keyword define-keyword))
      (0 font-lock-keyword-face)
      ;; Anchored match for anything that looks like a valid name.
      (,(renpy-rx name)
@@ -1311,7 +1313,9 @@ don't move and return nil.  Otherwise return t."
     ("/image" ,(renpy-rx image-keyword (1+ space) (group name)) 1)
     ("/screen" ,(renpy-rx screen-keyword (1+ space) (group name)) 1)
     ("/style" ,(renpy-rx style-keyword (1+ space) (group name)) 1)
-    ("/transform" ,(renpy-rx transform-keyword (1+ space) (group name)) 1)))
+    ("/transform" ,(renpy-rx transform-keyword (1+ space) (group name)) 1)
+    ("/define" ,(renpy-rx define-keyword (1+ space) (group name)) 1)
+    ("/default" ,(renpy-rx default-keyword (1+ space) (group name)) 1)))
 
 ;;;; `Electric' commands.
 
