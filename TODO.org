@@ -1,20 +1,28 @@
 * Testing
 
-- [ ] which-func tests
+- [X] more imenu tests
 
-- [ ] more imenu tests
+  - [X] defines/defaults in imenu
+
+  - [X] cover everything
+
+- [-] font-locking tests with ert-font-lock
+
+  - [X] setup the tests for emacs 30 only
+
+  - [ ] ren'py statements
+
+  - [ ] python blocks
+
+  - [ ] inline python?
+
+- [ ] which-func tests
 
 - [ ] movement tests
 
 - [ ] indentation tests
 
-- [ ] font-locking tests
-
 - [ ] automated testing with multiple emacs versions
-
-* Font lock
-
-- [ ] local label syntax highlight
 
 * Xref support
 
