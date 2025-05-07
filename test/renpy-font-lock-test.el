@@ -15,6 +15,10 @@ label start:
 #^^^^font-lock-keyword-face
 #     ^^^^^ font-lock-function-name-face
     say \"Hello, World!\"
+
+label .local_label:
+#     ^^^^^^^^^^^^ font-lock-function-name-face
+    pass
 "))
 
 ;;; renpy-font-lock-test.el ends here

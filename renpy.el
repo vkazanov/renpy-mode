@@ -58,11 +58,7 @@
 		  (0+ (or alphanumeric "_"))
 		  symbol-end))
 	    (label-name
-	     (seq (optional ".")
-		  symbol-start
-		  (or alpha "_")
-		  (0+ (or alphanumeric "_"))
-		  symbol-end))
+	     (seq (optional ".") name))
 	    (image-name
 	     (seq symbol-start
 		  (1+ (or alphanumeric "_"))
