@@ -7,7 +7,7 @@
 
 ;;;; Imenu tests
 
-; TODO: figure out proper imenu names
+;; TODO: Figure out proper imenu names.
 
 (ert-deftest test-renpy-imenu-basic ()
   (with-temp-buffer-str

@@ -11,7 +11,7 @@
 
 (script "test" "echo \"Error: no test specified\" && exit 1")
 
-;;; Avoid anything non-gnu as dependencies
+;; Avoid anything non-gnu as dependencies.
 (source "gnu")
 
 (depends-on "emacs" "27.1")
