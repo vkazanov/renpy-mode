@@ -55,7 +55,6 @@ inspiration:
 
 - [ ] Contribution
 
-
 * Publishing
 
 - [ ] rename to renpy-mode (also in Melpa)
