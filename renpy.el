@@ -57,6 +57,8 @@
 		  (or alpha "_")
 		  (0+ (or alphanumeric "_"))
 		  symbol-end))
+	    (label-name
+	     (seq (optional ".") name))
 	    (image-name
 	     (seq symbol-start
 		  (1+ (or alphanumeric "_"))
@@ -77,10 +79,12 @@
 	    ;; Images.
 	    (image-keyword
 	     (seq line-start "image" symbol-end))
-	    ;; Define or default.  Allow indentation for use in explicit init
-	    ;; blocks or within a screen.
-	    (default-or-define-keyword
-	      (seq line-start (0+ space) (or "default" "define") symbol-end))
+	    ;; Define and default. Both allow indentation for use in explicit
+	    ;; init blocks or within a screen.
+	    (define-keyword
+	     (seq line-start (0+ space) "define" symbol-end))
+	    (default-keyword
+	     (seq line-start (0+ space) "default" symbol-end))
 	    ;; Init.
 	    (init-keyword
 	     (seq line-start "init" symbol-end))
@@ -364,7 +368,7 @@
 	  symbol-end)
      . font-lock-builtin-face)
     ;; Ren'Py 8.0.3
-    (,(renpy-rx (group label-keyword) (1+ space) (group name))
+    (,(renpy-rx (group label-keyword) (1+ space) (group label-name))
      (1 font-lock-keyword-face) (2 font-lock-function-name-face))
     (,(renpy-rx (group screen-keyword) (1+ space) (group name))
      (1 font-lock-keyword-face) (2 font-lock-function-name-face))
@@ -380,7 +384,7 @@
 	(search-forward-regexp "=" (line-end-position) t))
       nil
       (0 font-lock-preprocessor-face)))
-    (,(renpy-rx default-or-define-keyword)
+    (,(renpy-rx (or default-keyword define-keyword))
      (0 font-lock-keyword-face)
      ;; Anchored match for anything that looks like a valid name.
      (,(renpy-rx name)
@@ -1299,13 +1303,15 @@ don't move and return nil.  Otherwise return t."
 ;;;; Imenu.
 
 (defvar renpy-generic-imenu
-  `((nil ,(renpy-rx label-keyword (1+ space) (group name)) 1)
+  `((nil ,(renpy-rx label-keyword (1+ space) (group label-name)) 1)
     ("/class" ,(renpy-rx symbol-start "class" (1+ space) (group name)) 1)
     ("/function" ,(renpy-rx symbol-start "def" (1+ space) (group name)) 1)
     ("/image" ,(renpy-rx image-keyword (1+ space) (group name)) 1)
     ("/screen" ,(renpy-rx screen-keyword (1+ space) (group name)) 1)
     ("/style" ,(renpy-rx style-keyword (1+ space) (group name)) 1)
-    ("/transform" ,(renpy-rx transform-keyword (1+ space) (group name)) 1)))
+    ("/transform" ,(renpy-rx transform-keyword (1+ space) (group name)) 1)
+    ("/define" ,(renpy-rx define-keyword (1+ space) (group name)) 1)
+    ("/default" ,(renpy-rx default-keyword (1+ space) (group name)) 1)))
 
 ;;;; `Electric' commands.
 
