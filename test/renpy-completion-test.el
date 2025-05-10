@@ -49,7 +49,7 @@ label .local_label:
       (should (member ".local_label" labels)))))
 
 (renpy-test-capf none
-  "
+		 "
 label start:
     pass
 
@@ -59,7 +59,7 @@ label other:
 label .local:
     pass | # invalid context
 "
-  ())
+		 ())
 
 (renpy-test-capf jump-label
   "
@@ -90,5 +90,46 @@ label .local:
 call st|
 "
   ("start" "other" ".local"))
+
+;;;; Local image completion
+
+(ert-deftest test-renpy-completion-collect-images ()
+  (with-temp-buffer-str
+"
+image eileen happy = \"eileen_happy.png\"
+image black = \"#000\"
+image bg tiled = Tile(\"tile.jpg\")
+
+image eileen happy question = VBox(
+    \"question.png\",
+    \"eileen_happy.png\",
+    )
+"
+    (let ((images (renpy--collect-images)))
+      (should (equal (length images) 4))
+      (should (member "eileen happy" images))
+      (should (member "black" images))
+      (should (member "bg tiled" images))
+      (should (member "eileen happy question" images)))))
+
+(renpy-test-capf show-image
+  "
+image eileen happy = \"eileen_happy.png\"
+image black = \"#000\"
+image bg tiled = Tile(\"tile.jpg\")
+
+show |
+"
+  ("eileen happy" "black" "bg tiled"))
+
+(renpy-test-capf scene-image
+  "
+image eileen happy = \"eileen_happy.png\"
+image black = \"#000\"
+image bg tiled = Tile(\"tile.jpg\")
+
+scene |
+"
+  ("eileen happy" "black" "bg tiled"))
 
 ;;; renpy-completion-test.el ends here

@@ -39,9 +39,17 @@ inspiration:
 
 - [X] local label completion
 
-- [ ] global label completion
+- [X] local image completion
 
-- [ ] keyword completions
+- [ ] local hide completion
+
+- [ ] local transform completion
+
+- [ ] image directory completion
+
+- [ ] keyword completion
+
+- [ ] global completion
 
 * Integration
 

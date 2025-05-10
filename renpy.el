@@ -1569,20 +1569,43 @@ Uses `renpy-beginning-of-block', `renpy-end-of-block'."
         (push (match-string-no-properties 1) labels)))
     labels))
 
+(defvar renpy--image-definition-re
+  (renpy-rx image-keyword (1+ space)
+	    (group image-name		; tag
+		   (0+ space name))	; attributes
+	    (0+ space) "=")
+  "Regexp for looking up image definitions.")
+
+(defun renpy--collect-images ()
+  "Return all unique image names in the current buffer."
+  (let (images)
+    (save-excursion
+      (goto-char (point-min))
+      (while (re-search-forward renpy--image-definition-re nil t)
+        (push (match-string-no-properties 1) images)))
+    images))
+
 ;;;###autoload
 (defun renpy-completion-at-point ()
   "Provide completion data for the symbol at point in Ren'Py buffers."
   (when (derived-mode-p 'renpy-mode)
-    (pcase (renpy--completion-context)
-      (:label
-       (let* ((end (point))
-              (beg (save-excursion
-                     (skip-syntax-backward "w_")
-                     (point)))
-              (cands (renpy--collect-labels)))
-         (when cands
-           (list beg end cands :exclusive 'no))))
-      (_ nil))))
+    (let (candidates beg end)
+      (pcase (renpy--completion-context)
+	(:label
+	 (setq end (point)
+	       beg (save-excursion
+		     (skip-syntax-backward "w_")
+		     (point))
+	       candidates (renpy--collect-labels)))
+	(:image
+	 (setq end (point)
+	       beg (save-excursion
+		     (skip-syntax-backward "w_")
+		     (point))
+	       candidates (renpy--collect-images)))
+	(_ nil))
+      (when candidates
+        (list beg end candidates :exclusive 'no)))))
 
 ;;;###autoload
 (defun renpy-enable-completion-at-point ()
