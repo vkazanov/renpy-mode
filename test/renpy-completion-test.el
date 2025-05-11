@@ -122,6 +122,16 @@ show |
 "
   ("eileen happy" "black" "bg tiled"))
 
+(renpy-test-capf hide-image
+  "
+image eileen happy = \"eileen_happy.png\"
+image black = \"#000\"
+image bg tiled = Tile(\"tile.jpg\")
+
+hide |
+"
+  ("eileen happy" "black" "bg tiled"))
+
 (renpy-test-capf scene-image
   "
 image eileen happy = \"eileen_happy.png\"
