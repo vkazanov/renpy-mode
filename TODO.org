@@ -81,6 +81,14 @@ Key VSCode plugin implementation points:
 
 - [ ] Suggest for inclusion to Ren'py itself
 
+- [ ] display images through a popup window or a tooltip
+
+- [ ] display colors / color picker
+
+- [ ] snippets based on vscode ones
+
+  https://github.com/renpy/vscode-language-renpy/blob/master/snippets/snippets.json
+
 * Document
 
 - [ ] Existing facilities
@@ -88,6 +96,8 @@ Key VSCode plugin implementation points:
 - [ ] Launcher integration
 
 - [ ] Contribution
+
+- [ ] document linting, emacs version support, dev process
 
 * Publishing
 
