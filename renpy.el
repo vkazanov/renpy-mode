@@ -1536,32 +1536,117 @@ Uses `renpy-beginning-of-block', `renpy-end-of-block'."
   :type 'boolean
   :group 'renpy)
 
-(defun renpy--completion-context ()
-  "Return the completion category for point."
-  ;; TODO: Make sure the point is not within a comment or a string.
-  ;; TODO: More specific contexts: show text, show expression, ...
-  (save-excursion
-    (skip-syntax-backward "w_")
-    (let* ((_ (skip-syntax-backward " "))
-           (prev  (thing-at-point 'symbol)))
-      (cond
-       ;; call <point>
-       ((equal prev "call") :label)
-       ;; jump <point>
-       ((equal prev "jump") :label)
-       ;; show/scene/hide <point>
-       ((member prev '("show" "scene" "hide")) :image)
-       ;; at <point>
-       ((equal prev "at") :transform)
-       ;; default
-       (t :none)))))
+(defconst renpy--python-header-re
+  (rx bol (* space)
+      (or "python"
+          (seq "init" (+ space) (*? nonl) "python"))
+      (*? nonl) ":" (* space) eol)
+  "A regexp capturing Python blocks.")
 
-(defvar renpy--label-definition-re
+(defconst renpy--renpy-header-re
+  (rx bol (* space)
+      (or "label" "screen" "transform" "style" "menu" "image")
+      (*? nonl) ":" (* space) eol)
+  "A regexp capturing blocks that are definitely not Python.")
+
+(defun renpy--python-block-p ()
+  "Return non-nil when point is inside a Ren'Py Python block."
+  (save-excursion
+    (let ((orig-col (current-column))
+          python-p done)
+      ;; Search for lines that end with ':' and aren't comments/blank. 3 cases
+      ;; possible:
+      ;;
+      ;; 1. Renpy statement - the block is *not* Python.
+      ;;
+      ;; 2. Python block statement - the block *is* python
+      ;;
+      ;; 3. Usual Python statement - keep looking.
+      (while (and (not done)
+		  (re-search-backward
+		   (rx line-start
+		       (* space)
+		       (not "#")
+		       (*? not-newline)
+		       ":"
+		       (zero-or-more not-newline)
+		       line-end)
+		   nil t))
+        (when (< (current-indentation) orig-col) ; first enclosing header
+          (cond
+           ((looking-at-p renpy--python-header-re)
+            (setq python-p t
+                  done t))
+           ((looking-at-p renpy--renpy-header-re)
+            (setq python-p nil
+                  done t))
+           ;; ordinary Python block, keep looking
+           )))
+      python-p)))
+
+(defun renpy--inline-python-statement-p ()
+  "Return non-nil when point is inside a Ren'Py one-line Python statement."
+  (save-excursion
+    (goto-char (line-beginning-position))
+    (looking-at (rx line-start
+		    (zero-or-more space)
+		    "$"))))
+
+(defun renpy--completion-context-check ()
+  "Check if the point is at a place suitable for completion."
+  (not (or
+	;; Literals
+	(renpy-in-string-comment)
+	;; Not in parens
+	(> (car (syntax-ppss)) 0)
+	;; Single-line python statements
+	(renpy--inline-python-statement-p)
+	;; Check enclosing blocks
+	(renpy--python-block-p))))
+
+(defconst renpy--completion-keywords '("call" "jump" "show" "scene" "hide" "at")
+  "A list of keywords that can precede a completion context point.")
+
+(defun renpy--skip-to-keyword-backward ()
+  "Move the point backwards to the first known keyword word.
+Return the keyword string or nil.  A keyword is only reported when there
+is a whitespace after it."
+  ;; Skip words one by one until a keyword-like word is found.
+  (let (prev-pos (pos (point))
+		 candidate keyword whitespace)
+    (while (not (or (bolp) keyword (eq prev-pos pos)))
+      ;; Remember if a whitespace was found.
+      (setq whitespace (not (= (skip-syntax-backward " ") 0)))
+      (skip-syntax-backward "w_.")
+      (setq candidate (thing-at-point 'symbol t))
+      (if (member candidate renpy--completion-keywords)
+	  ;; exit condition
+	  (setq keyword candidate)
+	(setq prev-pos pos)
+	(setq pos (point))))
+    (goto-char pos)
+    (and whitespace keyword)))
+
+(defun renpy--completion-context ()
+  "Return the completion category keyword symbol at point."
+  ;; TODO: More specific contexts: show text, show expression, ...
+  (and (renpy--completion-context-check)
+       (save-excursion
+	 (let ((prev (renpy--skip-to-keyword-backward)))
+	   (cond
+	    ;; call/jump <point>
+	    ((member prev '("call" "jump")) :label)
+	    ;; show/scene/hide <point>
+	    ((member prev '("show" "scene" "hide")) :image)
+	    ;; at <point>
+	    ((equal prev "at") :transform))))))
+
+(defconst renpy--label-definition-re
   (renpy-rx label-keyword (1+ space) (group label-name))
   "Regexp for looking up label definitions.")
 
 (defun renpy--collect-labels ()
-  "Return all unique label names in the current buffer."
+  "Return all label names in the current buffer."
   (let (labels)
     (save-excursion
       (goto-char (point-min))
@@ -1569,15 +1654,15 @@ Uses `renpy-beginning-of-block', `renpy-end-of-block'."
         (push (match-string-no-properties 1) labels)))
     labels))
 
-(defvar renpy--image-definition-re
+(defconst renpy--image-definition-re
   (renpy-rx image-keyword (1+ space)
 	    (group image-name		; tag
 		   (0+ space name))	; attributes
-	    (0+ space) "=")
+	    (0+ space) (or "=" ":"))
   "Regexp for looking up image definitions.")
 
 (defun renpy--collect-images ()
-  "Return all unique image names in the current buffer."
+  "Return all image names in the current buffer."
   (let (images)
     (save-excursion
       (goto-char (point-min))
@@ -1585,34 +1670,45 @@ Uses `renpy-beginning-of-block', `renpy-end-of-block'."
         (push (match-string-no-properties 1) images)))
     images))
 
-;;;###autoload
+(defconst renpy--transform-definition-re
+  (renpy-rx transform-keyword (1+ space) (group name))
+  "Regexp for looking up transform definitions.")
+
+(defun renpy--collect-transforms ()
+  "Return all transform names in the current buffer."
+  (let (transforms)
+    (save-excursion
+      (goto-char (point-min))
+      (while (re-search-forward renpy--transform-definition-re nil t)
+        (push (match-string-no-properties 1) transforms)))
+    transforms))
+
 (defun renpy-completion-at-point ()
   "Provide completion data for the symbol at point in Ren'Py buffers."
-  (when (derived-mode-p 'renpy-mode)
-    (let (candidates beg end)
-      (pcase (renpy--completion-context)
-	(:label
-	 (setq end (point)
-	       beg (save-excursion
-		     (skip-syntax-backward "w_")
-		     (point))
-	       candidates (renpy--collect-labels)))
-	(:image
-	 (setq end (point)
-	       beg (save-excursion
-		     (skip-syntax-backward "w_")
-		     (point))
-	       candidates (renpy--collect-images)))
-	(_ nil))
-      (when candidates
-        (list beg end candidates :exclusive 'no)))))
+  (let (candidates beg end)
+    (pcase (renpy--completion-context)
+      (:label
+       (setq end (point)
+	     beg (save-excursion
+		   (skip-syntax-backward "w_.")
+		   (point))
+	     candidates (renpy--collect-labels)))
+      (:image
+       (setq end (point)
+	     beg (save-excursion
+		   (renpy--skip-to-keyword-backward)
+		   (point))
+	     candidates (renpy--collect-images)))
+      (:transform
+       (setq end (point)
+	     beg (save-excursion
+		   (skip-syntax-backward "w_")
+		   (point))
+	     candidates (renpy--collect-transforms))))
+    (and candidates
+	 (list beg end candidates :exclusive 'no))))
 
-;;;###autoload
-(defun renpy-enable-completion-at-point ()
-  "Enable Ren'Py completion in the current buffer."
-  (add-hook 'completion-at-point-functions
-            #'renpy-completion-at-point nil t))
-
+
 ;;;; Modes.
 
 ;;;###autoload
@@ -1688,7 +1784,8 @@ with skeleton expansions for compound statement templates.
 
   ;; Install the capf function.
   (when renpy-setup-completion
-    (renpy-enable-completion-at-point)))
+    (add-hook 'completion-at-point-functions
+	      #'renpy-completion-at-point nil t)))
 
 ;; Not done automatically in Emacs 21 or 22.
 (defcustom renpy-mode-hook nil

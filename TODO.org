@@ -40,7 +40,15 @@
 
 - [X] local hide completion
 
-- [ ] local transform completion
+- [-] local transform completion
+
+  - [X] single transform
+
+  - [ ] dot-separated identifiers
+
+  - [ ] multiple comma-separated transforms
+
+  - [ ] built-in transforms
 
 - [ ] image directory completion
 
@@ -81,6 +89,16 @@ Key VSCode plugin implementation points:
 
 - [ ] Suggest for inclusion to Ren'py itself
 
+- [ ] display images through a popup window or a tooltip
+
+- [ ] display colors / color picker
+
+  suggest rainbow-mode / colorful-mode for this purpose in documentation
+
+- [ ] snippets based on vscode ones
+
+  https://github.com/renpy/vscode-language-renpy/blob/master/snippets/snippets.json
+
 * Document
 
 - [ ] Existing facilities
@@ -88,6 +106,8 @@ Key VSCode plugin implementation points:
 - [ ] Launcher integration
 
 - [ ] Contribution
+
+- [ ] document linting, emacs version support, dev process
 
 * Publishing
 
