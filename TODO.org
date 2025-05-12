@@ -40,7 +40,15 @@
 
 - [X] local hide completion
 
-- [ ] local transform completion
+- [-] local transform completion
+
+  - [X] single transform
+
+  - [ ] dot-separated identifiers
+
+  - [ ] multiple comma-separated transforms
+
+  - [ ] built-in transforms
 
 - [ ] image directory completion
 

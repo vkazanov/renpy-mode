@@ -142,4 +142,25 @@ scene |
 "
   ("eileen happy" "black" "bg tiled"))
 
+;;;; Local transform completion
+
+(ert-deftest test-renpy-completion-collect-transforms ()
+  (with-temp-buffer-str
+"transform left_to_right:
+    xalign 0.
+    linear 2 xalign 1.
+    repeat
+
+transform animated_ariana_disp:
+    \"ariana\"
+    pause 1.
+    \"ariana_reverse\"
+    pause 1.
+    repeat
+"
+    (let ((transforms (renpy--collect-transforms)))
+      (should (equal (length transforms) 2))
+      (should (member "left_to_right" transforms))
+      (should (member "animated_ariana_disp" transforms)))))
+
 ;;; renpy-completion-test.el ends here

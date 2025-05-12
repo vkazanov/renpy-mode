@@ -1585,6 +1585,19 @@ Uses `renpy-beginning-of-block', `renpy-end-of-block'."
         (push (match-string-no-properties 1) images)))
     images))
 
+(defvar renpy--transform-definition-re
+  (renpy-rx transform-keyword (1+ space) (group name))
+  "Regexp for looking up transform definitions.")
+
+(defun renpy--collect-transforms ()
+  "Return all unique transform names in the current buffer."
+  (let (transforms)
+    (save-excursion
+      (goto-char (point-min))
+      (while (re-search-forward renpy--transform-definition-re nil t)
+        (push (match-string-no-properties 1) transforms)))
+    transforms))
+
 ;;;###autoload
 (defun renpy-completion-at-point ()
   "Provide completion data for the symbol at point in Ren'Py buffers."
