@@ -1616,6 +1616,12 @@ Uses `renpy-beginning-of-block', `renpy-end-of-block'."
 		     (skip-syntax-backward "w_")
 		     (point))
 	       candidates (renpy--collect-images)))
+	(:transform
+	 (setq end (point)
+	       beg (save-excursion
+		     (skip-syntax-backward "w_")
+		     (point))
+	       candidates (renpy--collect-transforms)))
 	(_ nil))
       (when candidates
         (list beg end candidates :exclusive 'no)))))
