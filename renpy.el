@@ -1529,6 +1529,76 @@ Uses `renpy-beginning-of-block', `renpy-end-of-block'."
   (renpy-end-of-block)
   (exchange-point-and-mark))
 
+
+;;;; Flymake support
+
+(defcustom renpy-flymake-command '("renpy")
+  "Command that invokes Ren'Py."
+  :type '(repeat string)
+  :group 'renpy)
+
+(defcustom renpy-enable-flymake t
+  "If non-nil, register a Ren'py-specific Flymake backend. "
+  :type 'boolean
+  :group 'renpy)
+
+(defvar renpy--flymake-regex-list
+  '(;; Format: path/to/scrip.rpy:111 Error message
+    "^\\([^:\n]+\\):\\([0-9]+\\) \\(.*\\)$"
+    ;; Format: File \"path/to/file/script.rpy\", line 27: expected statement.
+    "^File \"\\([^\"]+\\)\", line \\([0-9]+\\): \\(.*\\)$")
+  "A list of regexps used to catch renpy lint errors/warnings")
+
+(defvar-local renpy--flymake-proc nil
+  "Flymake process for the current buffer.")
+
+(defun renpy--find-project-root ()
+  "Find the Ren'Py project root by looking for a 'game' directory."
+  (let ((dir (locate-dominating-file default-directory "game")))
+    (when dir (expand-file-name (file-name-concat dir "game")))))
+
+(defun renpy--parse-lint-buffer (buffer)
+  "Parse warning/error messages in BUFFER output and return Flymake. "
+  (with-current-buffer buffer
+    (goto-char (point-min))
+    (let (diags)
+      (dolist (re renpy--flymake-regex-list)
+	(while (re-search-forward re nil t)
+          (let* ((fname (match-string 1))
+		 (line (string-to-number (match-string 2)))
+		 (msg (match-string 3)))
+            (push (flymake-make-diagnostic
+                   fname (cons line 0) nil :error msg)
+                  diags))))
+      diags)))
+
+(defun renpy--flymake-backend (report-fn &rest _args)
+  "Flymake backend that runs Ren'Py lint on the project."
+  (unless (executable-find (car renpy-flymake-command))
+    (error "Cannot find `%s` executable" (car renpy-flymake-command)))
+  (let* ((source (current-buffer))
+         (root (renpy--find-project-root)))
+    (if (not root) (funcall report-fn nil)
+      (when (process-live-p renpy--flymake-proc)
+        (kill-process renpy--flymake-proc))
+      (let ((proc
+             (make-process
+              :name "renpy-flymake"
+              :buffer (generate-new-buffer "*renpy-flymake*")
+              :command (append renpy-flymake-command (list root "lint"))
+              :noquery t
+              :sentinel
+              (lambda (p _event)
+                (when (memq (process-status p) '(exit signal))
+                  (unwind-protect
+                      (if (eq p renpy--flymake-proc)
+                          (let ((diags (renpy--parse-lint-buffer
+                                        (process-buffer p))))
+                            (funcall report-fn diags))
+                        (flymake-log :warning "Obsolete Flymake process %s" p))
+                    (kill-buffer (process-buffer p))))))))
+        (setq renpy--flymake-proc proc)))))
+
 ;;;; Modes.
 
 ;;;###autoload
@@ -1600,7 +1670,10 @@ with skeleton expansions for compound statement templates.
   (setq electric-indent-inhibit t)
   ;; Setup indentation (Ren'Py cannot use tabs).
   (when renpy-guess-indent (renpy-guess-indent))
-  (setq indent-tabs-mode nil))
+  (setq indent-tabs-mode nil)
+
+  (when renpy-enable-flymake
+    (add-hook 'flymake-diagnostic-functions #'renpy--flymake-backend nil t)))
 
 ;; Not done automatically in Emacs 21 or 22.
 (defcustom renpy-mode-hook nil

@@ -47,6 +47,8 @@ inspiration:
 
 - [ ] Suggest for inclusion?
 
+- [X] flymake + renpy lint
+
 * Document
 
 - [ ] Existing facilities
