@@ -52,7 +52,9 @@ inspiration:
 
 - [X] flymake + renpy lint
 
-- [ ] renpy run / compile
+- [X] renpy run
+
+- [ ] renpy compile (compilation-mode + regex)
 
 * Document
 
