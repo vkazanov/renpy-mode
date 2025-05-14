@@ -43,6 +43,13 @@
   :prefix "renpy-"
   :group 'languages
   :link '(emacs-commentary-link "renpy"))
+
+(defcustom renpy-command '("renpy")
+  "Command that invokes Ren'Py.
+Used to run lint, invoke compile and run the project."
+  :type '(repeat string)
+  :group 'renpy)
+
 
 ;;;###autoload
 (add-to-list 'auto-mode-alist '("\\.rpym?\\'" . renpy-mode))
@@ -565,6 +572,11 @@ Used for syntactic keywords.  N is the match number (1, 2 or 3)."
     table))
 
 ;;;; Utility stuff
+
+(defun renpy--find-project-root ()
+  "Find the Ren'Py project root by looking for a 'game' directory."
+  (let ((dir (locate-dominating-file default-directory "game")))
+    (when dir (expand-file-name (file-name-concat dir "game")))))
 
 (defsubst renpy-in-string-comment ()
   "Return non-nil if point is in a Renpy literal (a comment or string)."
@@ -1528,14 +1540,9 @@ Uses `renpy-beginning-of-block', `renpy-end-of-block'."
   (push-mark (point) nil t)
   (renpy-end-of-block)
   (exchange-point-and-mark))
+
 
-
 ;;;; Flymake support
-
-(defcustom renpy-flymake-command '("renpy")
-  "Command that invokes Ren'Py."
-  :type '(repeat string)
-  :group 'renpy)
 
 (defcustom renpy-enable-flymake t
   "If non-nil, register a Ren'py-specific Flymake backend. "
@@ -1551,11 +1558,6 @@ Uses `renpy-beginning-of-block', `renpy-end-of-block'."
 
 (defvar-local renpy--flymake-proc nil
   "Flymake process for the current buffer.")
-
-(defun renpy--find-project-root ()
-  "Find the Ren'Py project root by looking for a 'game' directory."
-  (let ((dir (locate-dominating-file default-directory "game")))
-    (when dir (expand-file-name (file-name-concat dir "game")))))
 
 (defun renpy--parse-lint-buffer (buffer)
   "Parse warning/error messages in BUFFER output and return Flymake. "
@@ -1574,8 +1576,8 @@ Uses `renpy-beginning-of-block', `renpy-end-of-block'."
 
 (defun renpy--flymake-backend (report-fn &rest _args)
   "Flymake backend that runs Ren'Py lint on the project."
-  (unless (executable-find (car renpy-flymake-command))
-    (error "Cannot find `%s` executable" (car renpy-flymake-command)))
+  (unless (executable-find (car renpy-command))
+    (error "Cannot find `%s` executable" (car renpy-command)))
   (let* ((source (current-buffer))
          (root (renpy--find-project-root)))
     (if (not root) (funcall report-fn nil)
@@ -1585,7 +1587,7 @@ Uses `renpy-beginning-of-block', `renpy-end-of-block'."
              (make-process
               :name "renpy-flymake"
               :buffer (generate-new-buffer "*renpy-flymake*")
-              :command (append renpy-flymake-command (list root "lint"))
+              :command (append renpy-command (list root "lint"))
               :noquery t
               :sentinel
               (lambda (p _event)
@@ -1598,6 +1600,52 @@ Uses `renpy-beginning-of-block', `renpy-end-of-block'."
                         (flymake-log :warning "Obsolete Flymake process %s" p))
                     (kill-buffer (process-buffer p))))))))
         (setq renpy--flymake-proc proc)))))
+
+
+;;;; Renpy Run
+
+(defvar renpy--run-process nil
+  "The live process created by `renpy-run-project'.")
+
+(defun renpy-run (&optional root)
+  "Launch the project.
+
+If ROOT is nil, try to auto-detect the project. If auto-detection fails,
+prompt the user for the project directory."
+  (interactive)
+  (when (process-live-p renpy--run-process)
+    (if (y-or-n-p "A Ren'Py game is already running. Kill it? ")
+        (renpy-stop)
+      (user-error "Abort: a game is already running")))
+  (unless (executable-find (car renpy-command))
+    (user-error "Cannot find '%s' in `exec-path`" (car renpy-command)))
+  (let* ((proj (or root (renpy--find-project-root)
+                   (read-directory-name "Ren'Py project root: ")))
+         (default-directory proj)
+         (buffer (get-buffer-create "*RenPy Run*"))
+         (cmd    (append renpy-command (list proj "run"))))
+    (setq renpy--run-process
+          (make-process
+           :name    "renpy-run"
+           :buffer  buffer
+           :command cmd
+           :noquery t
+           :sentinel
+           (lambda (p event)
+             (when (memq (process-status p) '(exit signal))
+               (message "Ren'Py run process finished")
+               (setq renpy--run-process nil)))))
+    (message "Started Ren'Py: %s" (mapconcat #'identity cmd " "))))
+
+(defun renpy-stop ()
+  "Kill the currently running Ren'Py game, if any."
+  (interactive)
+  (if (process-live-p renpy--run-process)
+      (progn
+        (kill-process renpy--run-process)
+        (setq renpy--run-process nil)
+        (message "Ren'Py game terminated."))
+    (message "No Ren'Py game is running.")))
 
 ;;;; Modes.
 

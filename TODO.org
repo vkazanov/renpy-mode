@@ -42,12 +42,17 @@ inspiration:
 - [ ] keyword-specific completions
 
 * Integration
+:PROPERTIES:
+:ID:       4131a3d5-a82f-4151-b221-c7f0157871da
+:END:
 
 - [ ] Ren'py launcher integration (see https://github.com/elizagamedev/renpy-mode)
 
 - [ ] Suggest for inclusion?
 
 - [X] flymake + renpy lint
+
+- [ ] renpy run / compile
 
 * Document
 
