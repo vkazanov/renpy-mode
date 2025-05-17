@@ -26,15 +26,15 @@
   "at |" :transform)
 
 (renpy-test-context default
-  "bla bla |" :none)
+  "bla bla |" nil)
 
 ;;;;; Comment and string contexts
 
 (renpy-test-context call-label-comment
-  "#call |" :none)
+  "#call |" nil)
 
 (renpy-test-context call-label-string
-  "\"call |\" " :none)
+  "\"call |\" " nil)
 
 ;;;; Local label completion
 

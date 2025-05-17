@@ -1544,13 +1544,13 @@ Uses `renpy-beginning-of-block', `renpy-end-of-block'."
 (defun renpy--completion-context ()
   "Return the completion category for point."
   ;; TODO: More specific contexts: show text, show expression, ...
-  (if (renpy--completion-context-check)
+  (when (renpy--completion-context-check)
       (save-excursion
 	;; TODO: just skipping a word might not be enough: "show eileen happy
 	;; <point>" doesn't work right now.
 	(skip-syntax-backward "w_")
-	(let* ((_ (skip-syntax-backward " "))
-               (prev  (thing-at-point 'symbol)))
+	(skip-syntax-backward " ")
+	(let ((prev  (thing-at-point 'symbol)))
 	  (cond
 	   ;; call <point>
 	   ((equal prev "call") :label)
@@ -1559,10 +1559,7 @@ Uses `renpy-beginning-of-block', `renpy-end-of-block'."
 	   ;; show/scene/hide <point>
 	   ((member prev '("show" "scene" "hide")) :image)
 	   ;; at <point>
-	   ((equal prev "at") :transform)
-	   ;; default
-	   (t :none))))
-    :none))
+	   ((equal prev "at") :transform))))))
 
 (defvar renpy--label-definition-re
   (renpy-rx label-keyword (1+ space) (group label-name))
@@ -1606,35 +1603,31 @@ Uses `renpy-beginning-of-block', `renpy-end-of-block'."
         (push (match-string-no-properties 1) transforms)))
     transforms))
 
-;;;###autoload
 (defun renpy-completion-at-point ()
   "Provide completion data for the symbol at point in Ren'Py buffers."
-  (when (derived-mode-p 'renpy-mode)
-    (let (candidates beg end)
-      (pcase (renpy--completion-context)
-	(:label
-	 (setq end (point)
-	       beg (save-excursion
-		     (skip-syntax-backward "w_")
-		     (point))
-	       candidates (renpy--collect-labels)))
-	(:image
-	 (setq end (point)
-	       beg (save-excursion
-		     (skip-syntax-backward "w_")
-		     (point))
-	       candidates (renpy--collect-images)))
-	(:transform
-	 (setq end (point)
-	       beg (save-excursion
-		     (skip-syntax-backward "w_")
-		     (point))
-	       candidates (renpy--collect-transforms)))
-	(_ nil))
-      (when candidates
-        (list beg end candidates :exclusive 'no)))))
+  (let (candidates beg end)
+    (pcase (renpy--completion-context)
+      (:label
+       (setq end (point)
+	     beg (save-excursion
+		   (skip-syntax-backward "w_")
+		   (point))
+	     candidates (renpy--collect-labels)))
+      (:image
+       (setq end (point)
+	     beg (save-excursion
+		   (skip-syntax-backward "w_")
+		   (point))
+	     candidates (renpy--collect-images)))
+      (:transform
+       (setq end (point)
+	     beg (save-excursion
+		   (skip-syntax-backward "w_")
+		   (point))
+	     candidates (renpy--collect-transforms))))
+    (when candidates
+      (list beg end candidates :exclusive 'no))))
 
-;;;###autoload
 (defun renpy-enable-completion-at-point ()
   "Enable Ren'Py completion in the current buffer."
   (add-hook 'completion-at-point-functions
