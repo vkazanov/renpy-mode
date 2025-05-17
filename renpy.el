@@ -1552,10 +1552,8 @@ Uses `renpy-beginning-of-block', `renpy-end-of-block'."
 	(skip-syntax-backward " ")
 	(let ((prev  (thing-at-point 'symbol)))
 	  (cond
-	   ;; call <point>
-	   ((equal prev "call") :label)
-	   ;; jump <point>
-	   ((equal prev "jump") :label)
+	   ;; call/jump <point>
+	   ((member prev '("call" "jump")) :label)
 	   ;; show/scene/hide <point>
 	   ((member prev '("show" "scene" "hide")) :image)
 	   ;; at <point>
