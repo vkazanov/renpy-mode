@@ -1546,6 +1546,8 @@ Uses `renpy-beginning-of-block', `renpy-end-of-block'."
   ;; TODO: More specific contexts: show text, show expression, ...
   (if (renpy--completion-context-check)
       (save-excursion
+	;; TODO: just skipping a word might not be enough: "show eileen happy
+	;; <point>" doesn't work right now.
 	(skip-syntax-backward "w_")
 	(let* ((_ (skip-syntax-backward " "))
                (prev  (thing-at-point 'symbol)))
