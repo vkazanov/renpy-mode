@@ -1561,7 +1561,7 @@ Uses `renpy-beginning-of-block', `renpy-end-of-block'."
 	   ;; at <point>
 	   ((equal prev "at") :transform))))))
 
-(defvar renpy--label-definition-re
+(defconst renpy--label-definition-re
   (renpy-rx label-keyword (1+ space) (group label-name))
   "Regexp for looking up label definitions.")
 
@@ -1574,7 +1574,7 @@ Uses `renpy-beginning-of-block', `renpy-end-of-block'."
         (push (match-string-no-properties 1) labels)))
     labels))
 
-(defvar renpy--image-definition-re
+(defconst renpy--image-definition-re
   (renpy-rx image-keyword (1+ space)
 	    (group image-name		; tag
 		   (0+ space name))	; attributes
@@ -1590,7 +1590,7 @@ Uses `renpy-beginning-of-block', `renpy-end-of-block'."
         (push (match-string-no-properties 1) images)))
     images))
 
-(defvar renpy--transform-definition-re
+(defconst renpy--transform-definition-re
   (renpy-rx transform-keyword (1+ space) (group name))
   "Regexp for looking up transform definitions.")
 
