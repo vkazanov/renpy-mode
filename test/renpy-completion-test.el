@@ -28,6 +28,14 @@
 (renpy-test-context default
   "bla bla |" :none)
 
+;;;;; Comment and string contexts
+
+(renpy-test-context call-label-comment
+  "#call |" :none)
+
+(renpy-test-context call-label-string
+  "\"call |\" " :none)
+
 ;;;; Local label completion
 
 (ert-deftest test-renpy-completion-collect-labels ()

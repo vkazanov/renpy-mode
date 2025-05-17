@@ -1536,25 +1536,31 @@ Uses `renpy-beginning-of-block', `renpy-end-of-block'."
   :type 'boolean
   :group 'renpy)
 
+(defun renpy--completion-context-check ()
+  "Check if the point is at a place suitable for completion."
+  (pcase-let ((`(,_ ,_ ,_ ,stringp ,commentp . ,_) (syntax-ppss)))
+    (not (or stringp commentp))))
+
 (defun renpy--completion-context ()
   "Return the completion category for point."
-  ;; TODO: Make sure the point is not within a comment or a string.
   ;; TODO: More specific contexts: show text, show expression, ...
-  (save-excursion
-    (skip-syntax-backward "w_")
-    (let* ((_ (skip-syntax-backward " "))
-           (prev  (thing-at-point 'symbol)))
-      (cond
-       ;; call <point>
-       ((equal prev "call") :label)
-       ;; jump <point>
-       ((equal prev "jump") :label)
-       ;; show/scene/hide <point>
-       ((member prev '("show" "scene" "hide")) :image)
-       ;; at <point>
-       ((equal prev "at") :transform)
-       ;; default
-       (t :none)))))
+  (if (renpy--completion-context-check)
+      (save-excursion
+	(skip-syntax-backward "w_")
+	(let* ((_ (skip-syntax-backward " "))
+               (prev  (thing-at-point 'symbol)))
+	  (cond
+	   ;; call <point>
+	   ((equal prev "call") :label)
+	   ;; jump <point>
+	   ((equal prev "jump") :label)
+	   ;; show/scene/hide <point>
+	   ((member prev '("show" "scene" "hide")) :image)
+	   ;; at <point>
+	   ((equal prev "at") :transform)
+	   ;; default
+	   (t :none))))
+    :none))
 
 (defvar renpy--label-definition-re
   (renpy-rx label-keyword (1+ space) (group label-name))
