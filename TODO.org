@@ -93,6 +93,8 @@ Key VSCode plugin implementation points:
 
 - [ ] display colors / color picker
 
+  suggest rainbow-mode / colorful-mode for this purpose in documentation
+
 - [ ] snippets based on vscode ones
 
   https://github.com/renpy/vscode-language-renpy/blob/master/snippets/snippets.json
