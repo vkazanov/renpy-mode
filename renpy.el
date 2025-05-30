@@ -1622,7 +1622,8 @@ The function assumes correct call context as defined by
      ((member tok-string renpy--completion-keywords)
       (intern tok-string))
      ((equal tok-string ",") 'comma)
-     ((string-empty-p tok-string) nil)
+     ;; (string-empty-p) not available in Emacs 27.1.
+     ((string-equal tok-string "") nil)
      (t tok-string))))
 
 (defun renpy--parse-backwards-line ()
@@ -1747,41 +1748,43 @@ tree is meant to simplify use for pattern matching."
 
 (defun renpy-completion-at-point ()
   "Provide completion data for the symbol at point in Ren'Py buffers."
-  (let (candidates beg end)
-    (pcase (renpy--completion-context)
-      ;; Given a recognized context, we know:
-      ;; 1. Expected structure of the partially completed prefix.
-      ;; 2. A function to use for candidate lookup.
-      (:label
-       ;; Labels are words + symbol constituents + punctuation.
-       (setq end (save-excursion
-		   (skip-syntax-forward "w_.")
-		   (point))
-	     beg (save-excursion
-		   (skip-syntax-backward "w_.")
-		   (point))
-	     candidates (renpy--collect-labels)))
-      (:image
-       ;; Images are whitespace-separated words + symbol constituents +
-       ;; punctuation.
-       (setq end (save-excursion
-		   (renpy--skip-to-keyword-forward)
-		   (point))
-	     beg (save-excursion
-		   (renpy--skip-to-keyword-backward)
-		   (point))
-	     candidates (renpy--collect-images)))
-      (:transform
-       ;; Transforms are words + symbol constituents.
-       (setq end (save-excursion
-		   (skip-syntax-forward "w_")
-		   (point))
-	     beg (save-excursion
-		   (skip-syntax-backward "w_")
-		   (point))
-	     candidates (renpy--collect-transforms))))
-    (and candidates
-	 (list beg end candidates :exclusive 'no))))
+  (save-restriction
+    (widen)
+    (let (candidates beg end)
+      (pcase (renpy--completion-context)
+	;; Given a recognized context, we know:
+	;; 1. Expected structure of the partially completed prefix.
+	;; 2. A function to use for candidate lookup.
+	(:label
+	 ;; Labels are words + symbol constituents + punctuation.
+	 (setq end (save-excursion
+		     (skip-syntax-forward "w_.")
+		     (point))
+	       beg (save-excursion
+		     (skip-syntax-backward "w_.")
+		     (point))
+	       candidates (renpy--collect-labels)))
+	(:image
+	 ;; Images are whitespace-separated words + symbol constituents +
+	 ;; punctuation.
+	 (setq end (save-excursion
+		     (renpy--skip-to-keyword-forward)
+		     (point))
+	       beg (save-excursion
+		     (renpy--skip-to-keyword-backward)
+		     (point))
+	       candidates (renpy--collect-images)))
+	(:transform
+	 ;; Transforms are words + symbol constituents.
+	 (setq end (save-excursion
+		     (skip-syntax-forward "w_")
+		     (point))
+	       beg (save-excursion
+		     (skip-syntax-backward "w_")
+		     (point))
+	       candidates (renpy--collect-transforms))))
+      (and candidates
+	   (list beg end candidates :exclusive 'no)))))
 
 
 ;;;; Modes.

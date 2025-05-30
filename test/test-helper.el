@@ -35,18 +35,33 @@ nil then no context should be found."
 The test runs `renpy-completion-at-point' within the CODE fragment,
 expecting an EXPECTED candidate list.  In CODE ‘|’ marks the point where
 completion is requested.  If EXPECTED is nil we assert that the CAPF
-returns nil."
+returns nil.
+
+The test is executed twice: as is and with narrowing on the line where
+the point is as this should affect the results."
   (declare (indent 1) (debug t))
-  `(ert-deftest ,(intern (format "test-renpy-completion-capf-%s" name)) ()
-     (with-temp-buffer-str ,code
-       (search-forward "|" nil t)
-       (delete-char -1)
-       (let ((candidates (renpy-completion-at-point)))
-         ,(if expected
-              `(progn
-                 (should candidates)
-                 (should (equal (sort (nth 2 candidates) #'string<)
-                                (sort ',expected #'string<))))
-            `(should (null candidates)))))))
+  (let ((test-body
+	 `(let ((candidates (renpy-completion-at-point)))
+		,(if expected
+		     `(progn
+			(should candidates)
+			(should (equal (sort (nth 2 candidates) #'string<)
+				       (sort expected #'string<))))
+		   `(should (null candidates))))))
+  `(ert-deftest ,(intern (format "test-renpy-capf-%s" name)) ()
+     ;; Main test body - run the tests.
+     (let ((expected (copy-sequence ',expected)))
+       (with-temp-buffer-str ,code
+	 (search-forward "|" nil t)
+	 (delete-char -1)
+	 ,test-body))
+     ;; Narrowing to the current line should not affect completion.
+     (let ((expected (copy-sequence ',expected)))
+       (with-temp-buffer-str ,code
+	 (search-forward "|" nil t)
+	 (delete-char -1)
+	 (narrow-to-region (line-beginning-position)
+			   (line-end-position))
+	 ,test-body)))))
 
 ;;; test-helper.el ends here

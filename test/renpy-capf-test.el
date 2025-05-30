@@ -21,8 +21,7 @@ label other:
 
 label .local:
     pass | # invalid context
-"
-  ())
+")
 
 (renpy-test-capf jump-label
   "
