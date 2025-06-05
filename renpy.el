@@ -1738,15 +1738,17 @@ Zero-length list counts as even."
 KIND should be recognized by `renpy--completion-annotate'."
   (propertize cand 'renpy-canditate-kind kind))
 
-(defun renpy--collect-labels ()
+(defun renpy--collect-labels (&optional _)
   "Return all label names in the current buffer."
-  (let (results)
-    (save-excursion
-      (goto-char (point-min))
-      (while (re-search-forward renpy--label-definition-re nil t)
-	(let ((str (match-string-no-properties 1)))
-          (push (renpy--make-candidate str :label) results))))
-    results))
+  (save-restriction
+    (widen)
+    (let (results)
+      (save-excursion
+	(goto-char (point-min))
+	(while (re-search-forward renpy--label-definition-re nil t)
+	  (let ((str (match-string-no-properties 1)))
+            (push (renpy--make-candidate str :label) results))))
+      results)))
 
 (defconst renpy--image-definition-re
   (renpy-rx image-keyword (1+ space)
@@ -1755,29 +1757,33 @@ KIND should be recognized by `renpy--completion-annotate'."
 	    (0+ space) (or "=" ":"))
   "Regexp for looking up image definitions.")
 
-(defun renpy--collect-images ()
+(defun renpy--collect-images (&optional _)
   "Return all image names in the current buffer."
-  (let (results)
-    (save-excursion
-      (goto-char (point-min))
-      (while (re-search-forward renpy--image-definition-re nil t)
-        (let ((str (match-string-no-properties 1)))
-          (push (renpy--make-candidate str :image) results))))
-    results))
+  (save-restriction
+    (widen)
+    (let (results)
+      (save-excursion
+	(goto-char (point-min))
+	(while (re-search-forward renpy--image-definition-re nil t)
+          (let ((str (match-string-no-properties 1)))
+            (push (renpy--make-candidate str :image) results))))
+      results)))
 
 (defconst renpy--transform-definition-re
   (renpy-rx transform-keyword (1+ space) (group name))
   "Regexp for looking up transform definitions.")
 
-(defun renpy--collect-transforms ()
+(defun renpy--collect-transforms (&optional _)
   "Return all transform names in the current buffer."
-  (let (results)
-    (save-excursion
-      (goto-char (point-min))
-      (while (re-search-forward renpy--transform-definition-re nil t)
-        (let ((str (match-string-no-properties 1)))
-          (push (renpy--make-candidate str :transform) results))))
-    results))
+  (save-restriction
+    (widen)
+    (let (results)
+      (save-excursion
+	(goto-char (point-min))
+	(while (re-search-forward renpy--transform-definition-re nil t)
+          (let ((str (match-string-no-properties 1)))
+            (push (renpy--make-candidate str :transform) results))))
+      results)))
 
 (defun renpy--completion-annotate (cand)
   "Return an annotation string for a completion candidate CAND."
@@ -1799,7 +1805,7 @@ Meant to be used as `:affixation-function'."
   "Provide completion data for the symbol at point in Ren'Py buffers."
   (save-restriction
     (widen)
-    (let (candidates beg end)
+    (let (collect beg end)
       (pcase (renpy--completion-context)
 	;; Given a recognized context, we know:
 	;; 1. Expected structure of the partially completed prefix.
@@ -1812,7 +1818,7 @@ Meant to be used as `:affixation-function'."
 	       beg (save-excursion
 		     (skip-syntax-backward "w_.")
 		     (point))
-	       candidates (renpy--collect-labels)))
+	       collect #'renpy--collect-labels))
 	(:image
 	 ;; Images are whitespace-separated words + symbol constituents +
 	 ;; punctuation.
@@ -1824,7 +1830,7 @@ Meant to be used as `:affixation-function'."
 		     ;; contexts expecting images into account.
 		     (renpy--skip-to-keyword-backward '("show" "hide" "scene"))
 		     (point))
-	       candidates (renpy--collect-images)))
+	       collect #'renpy--collect-images))
 	(:transform
 	 ;; Transforms are words + symbol constituents.
 	 (setq end (save-excursion
@@ -1833,10 +1839,13 @@ Meant to be used as `:affixation-function'."
 	       beg (save-excursion
 		     (skip-syntax-backward "w_")
 		     (point))
-	       candidates (renpy--collect-transforms))))
-      (and candidates (list beg end candidates
-			    :exclusive 'no
-			    :affixation-function #'renpy--completion-affixate)))))
+	       collect #'renpy--collect-transforms)))
+      (and collect (list beg end
+			 (completion-table-dynamic collect)
+			 ;; TODO: Once we know the precise context, other completion
+			 ;; engines should not apply.
+			 :exclusive 'no
+			 :affixation-function #'renpy--completion-affixate)))))
 
 
 ;;;; Modes.

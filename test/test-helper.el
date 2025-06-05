@@ -41,26 +41,35 @@ The test is executed twice: as is and with narrowing on the line where
 the point is as this should affect the results."
   (declare (indent 1) (debug t))
   (let ((test-body
-	 `(let ((candidates (renpy-completion-at-point)))
-		,(if expected
-		     `(progn
-			(should candidates)
-			(should (equal (sort (nth 2 candidates) #'string<)
-				       (sort expected #'string<))))
-		   `(should (null candidates))))))
-  `(ert-deftest ,(intern (format "test-renpy-capf-%s" name)) ()
-     ;; Main test body - run the tests.
-     (let ((expected (copy-sequence ',expected)))
-       (with-temp-buffer-str ,code
-	 (search-forward "|" nil t)
-	 (delete-char -1)
-	 ,test-body))
-     ;; Narrowing to the current point should not affect completion.
-     (let ((expected (copy-sequence ',expected)))
-       (with-temp-buffer-str ,code
-	 (search-forward "|" nil t)
-	 (delete-char -1)
-	 (narrow-to-region (point) (point))
-	 ,test-body)))))
+	 `(let* ((capf-ret (renpy-completion-at-point))
+		 (prefix
+		  (and capf-ret
+		       (save-restriction
+			 (widen)
+			 (buffer-substring-no-properties
+			  (nth 0 capf-ret)
+			  (nth 1 capf-ret)))))
+		 (table (nth 2 capf-ret))
+		 (candidates (and capf-ret (all-completions prefix table))))
+	    ,(if expected
+		 `(progn
+		    (should candidates)
+		    (should (equal (sort candidates #'string<)
+				   (sort expected #'string<))))
+	       `(should (null candidates))))))
+    `(ert-deftest ,(intern (format "test-renpy-capf-%s" name)) ()
+       ;; Main test body - run the tests.
+       (let ((expected (copy-sequence ',expected)))
+	 (with-temp-buffer-str ,code
+	   (search-forward "|" nil t)
+	   (delete-char -1)
+	   ,test-body))
+       ;; Narrowing to the current point should not affect completion.
+       (let ((expected (copy-sequence ',expected)))
+	 (with-temp-buffer-str ,code
+	   (search-forward "|" nil t)
+	   (delete-char -1)
+	   (narrow-to-region (point) (point))
+	   ,test-body)))))
 
 ;;; test-helper.el ends here

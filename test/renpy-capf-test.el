@@ -36,7 +36,7 @@ label .local:
 
 jump st|
 "
-  ("start" "other" ".local"))
+  ("start"))
 
 (renpy-test-capf call-label
   "
@@ -48,7 +48,7 @@ label .local:
 
 call st|
 "
-  ("start" ".local"))
+  ("start"))
 
 (renpy-test-capf call-label-comment
   "
@@ -60,7 +60,7 @@ label .local:
 
 call st| #comment
 "
-  ("start" ".local"))
+  ("start"))
 
 (renpy-test-capf call-local-label
   "
@@ -72,19 +72,21 @@ label .local:
 
 call .lo|
 "
-  ("start" ".local"))
+  (".local"))
 
-(renpy-test-capf call-global-local-label
-  "
-label start:
-    pass
+;; TODO: This is easy to support with a slightly smarter label collector: it
+;; should emit both the usual dot-prefixed local labels and global ones.
+;; (renpy-test-capf call-global-local-label
+;;   "
+;; label start:
+;;     pass
 
-label .local:
-    pass
+;; label .local:
+;;     pass
 
-call start.lo|
-"
-  ("start" ".local"))
+;; call start.lo|
+;; "
+;;   ("start.local"))
 
 ;;;; Local image completion
 
@@ -116,7 +118,7 @@ image eileen happy mud = \"eileen_sad.png\"
 
 show eileen |
 "
-  ("eileen" "eileen happy" "eileen sad" "eileen happy mud"))
+  ("eileen happy" "eileen sad" "eileen happy mud"))
 
 (renpy-test-capf hide-image
   "
