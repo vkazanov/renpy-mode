@@ -1666,8 +1666,8 @@ KEYWORDS is a list of keyword strings to skip to or
 		 (eq prev-pos pos)
 		 (save-excursion
 		   (skip-syntax-backward " ")
-		   (looking-back (regexp-opt keywords)
-				 (line-beginning-position)))))
+		   (member (thing-at-point 'symbol 'no-properties)
+			   keywords))))
       (condition-case nil
 	  (backward-sexp)
 	(scan-error nil))

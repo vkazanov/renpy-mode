@@ -58,13 +58,17 @@ The plan:
 
   - [ ] built-in transforms
 
+- [ ] image tag/attributes separation
+
+  - [ ] hide, etc only need a tag? check in the parser
+
 - [ ] image directory completion
 
 - [ ] keyword completion
 
 - [ ] project buffer completion
 
-- [ ] global completion
+- [ ] global completion (navigation.json?)
 
 ** Further notes
 
