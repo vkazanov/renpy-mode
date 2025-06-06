@@ -1729,14 +1729,40 @@ Zero-length list counts as even."
 	   ('(call) :label)
 	   ('(jump) :label)))))
 
-(defconst renpy--label-definition-re
-  (renpy-rx label-keyword (1+ space) (group label-name))
-  "Regexp for looking up label definitions.")
-
 (defun renpy--make-candidate (cand kind)
   "Return CAND with a text property that records its KIND.
 KIND should be recognized by `renpy--completion-annotate'."
   (propertize cand 'renpy-canditate-kind kind))
+
+(defvar-local renpy--collect-cache nil
+  "Alist of (KIND TICK SYMBOL) for cached Ren’Py completion in this buffer.")
+
+(defun renpy--collect-cached (kind collector-function prefix)
+  "Return cached DATA for KIND, or call COLLECTOR-FUNCTION to rebuild it.
+KIND is symbol representing the kind of cached data.  COLLECTOR-FUNCTION
+is a function that scans the buffer and returns a list of symbols to be
+cached.  PREFIX is a completion text to be passed to the
+COLLECTOR-FUNCTION."
+  (let* ((tick   (buffer-chars-modified-tick))
+         (entry  (assq kind renpy--collect-cache))
+         (entry-tick  (nth 1 entry))
+         (entry-data  (nth 2 entry)))
+    (if (and entry (= tick entry-tick))
+        entry-data
+      (let ((fresh (funcall collector-function prefix)))
+        (setq renpy--collect-cache
+              (cons (list kind tick fresh)
+                    (assq-delete-all kind renpy--collect-cache)))
+        fresh))))
+
+(defconst renpy--label-definition-re
+  (renpy-rx label-keyword (1+ space) (group label-name))
+  "Regexp for looking up label definitions.")
+
+(defun renpy--collect-labels-cached (&optional prefix)
+  "Cached version of `renpy--collect-labels'.
+PREFIX is a completion text to be passed into the collecting function."
+  (renpy--collect-cached 'labels #'renpy--collect-labels prefix))
 
 (defun renpy--collect-labels (&optional _)
   "Return all label names in the current buffer."
@@ -1757,6 +1783,11 @@ KIND should be recognized by `renpy--completion-annotate'."
 	    (0+ space) (or "=" ":"))
   "Regexp for looking up image definitions.")
 
+(defun renpy--collect-images-cached (&optional prefix)
+  "Cached version of `renpy--collect-images'.
+PREFIX is a completion text to be passed into the collecting function."
+  (renpy--collect-cached 'images #'renpy--collect-images prefix))
+
 (defun renpy--collect-images (&optional _)
   "Return all image names in the current buffer."
   (save-restriction
@@ -1773,6 +1804,11 @@ KIND should be recognized by `renpy--completion-annotate'."
   (renpy-rx transform-keyword (1+ space) (group name))
   "Regexp for looking up transform definitions.")
 
+(defun renpy--collect-transforms-cached (&optional prefix)
+  "Cached version of `renpy--collect-transforms'.
+PREFIX is a completion text to be passed into the collecting function."
+  (renpy--collect-cached 'transforms #'renpy--collect-transforms prefix))
+
 (defun renpy--collect-transforms (&optional _)
   "Return all transform names in the current buffer."
   (save-restriction
@@ -1788,10 +1824,10 @@ KIND should be recognized by `renpy--completion-annotate'."
 (defun renpy--completion-annotate (cand)
   "Return an annotation string for a completion candidate CAND."
   (pcase (get-text-property 0 'renpy-canditate-kind cand)
-    (:label      "label")
-    (:image      "image")
-    (:transform  "transform")
-    (:keyword  "keyword")
+    (:label      " label")
+    (:image      " image")
+    (:transform  " transform")
+    (:keyword  " keyword")
     (_ "")))
 
 (defun renpy--completion-affixate (cands)
@@ -1818,7 +1854,7 @@ Meant to be used as `:affixation-function'."
 	       beg (save-excursion
 		     (skip-syntax-backward "w_.")
 		     (point))
-	       collect #'renpy--collect-labels))
+	       collect #'renpy--collect-labels-cached))
 	(:image
 	 ;; Images are whitespace-separated words + symbol constituents +
 	 ;; punctuation.
@@ -1830,7 +1866,7 @@ Meant to be used as `:affixation-function'."
 		     ;; contexts expecting images into account.
 		     (renpy--skip-to-keyword-backward '("show" "hide" "scene"))
 		     (point))
-	       collect #'renpy--collect-images))
+	       collect #'renpy--collect-images-cached))
 	(:transform
 	 ;; Transforms are words + symbol constituents.
 	 (setq end (save-excursion
@@ -1839,12 +1875,16 @@ Meant to be used as `:affixation-function'."
 	       beg (save-excursion
 		     (skip-syntax-backward "w_")
 		     (point))
-	       collect #'renpy--collect-transforms)))
+	       collect #'renpy--collect-transforms-cached)))
       (and collect (list beg end
 			 (completion-table-dynamic collect)
 			 ;; TODO: Once we know the precise context, other completion
 			 ;; engines should not apply.
 			 :exclusive 'no
+			 ;; Both functions below are provided for backwards
+			 ;; compatibility. The affixation-function takes
+			 ;; priority in newer versions.
+			 :annotation-function #'renpy--completion-annotate
 			 :affixation-function #'renpy--completion-affixate)))))
 
 
