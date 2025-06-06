@@ -1729,11 +1729,6 @@ Zero-length list counts as even."
 	   ('(call) :label)
 	   ('(jump) :label)))))
 
-(defun renpy--make-candidate (cand kind)
-  "Return CAND with a text property that records its KIND.
-KIND should be recognized by `renpy--completion-annotate'."
-  (propertize cand 'renpy-canditate-kind kind))
-
 (defvar-local renpy--collect-cache nil
   "Alist of (KIND TICK SYMBOL) for cached Ren’Py completion in this buffer.")
 
@@ -1773,7 +1768,7 @@ PREFIX is a completion text to be passed into the collecting function."
 	(goto-char (point-min))
 	(while (re-search-forward renpy--label-definition-re nil t)
 	  (let ((str (match-string-no-properties 1)))
-            (push (renpy--make-candidate str :label) results))))
+            (push str results))))
       results)))
 
 (defconst renpy--image-definition-re
@@ -1797,7 +1792,7 @@ PREFIX is a completion text to be passed into the collecting function."
 	(goto-char (point-min))
 	(while (re-search-forward renpy--image-definition-re nil t)
           (let ((str (match-string-no-properties 1)))
-            (push (renpy--make-candidate str :image) results))))
+            (push str results))))
       results)))
 
 (defconst renpy--transform-definition-re
@@ -1818,24 +1813,8 @@ PREFIX is a completion text to be passed into the collecting function."
 	(goto-char (point-min))
 	(while (re-search-forward renpy--transform-definition-re nil t)
           (let ((str (match-string-no-properties 1)))
-            (push (renpy--make-candidate str :transform) results))))
+            (push str results))))
       results)))
-
-(defun renpy--completion-annotate (cand)
-  "Return an annotation string for a completion candidate CAND."
-  (pcase (get-text-property 0 'renpy-canditate-kind cand)
-    (:label      " label")
-    (:image      " image")
-    (:transform  " transform")
-    (:keyword  " keyword")
-    (_ "")))
-
-(defun renpy--completion-affixate (cands)
-  "Affixate a list of completion candidate strings from CANDS.
-Meant to be used as `:affixation-function'."
-  ;; A list of (CAND PREFIX ANNO SUFFIX) lists.
-  (mapcar (lambda (cand) (list cand "" (renpy--completion-annotate cand) ""))
-          cands))
 
 (defun renpy-completion-at-point ()
   "Provide completion data for the symbol at point in Ren'Py buffers."
@@ -1880,12 +1859,7 @@ Meant to be used as `:affixation-function'."
 			 (completion-table-dynamic collect)
 			 ;; TODO: Once we know the precise context, other completion
 			 ;; engines should not apply.
-			 :exclusive 'no
-			 ;; Both functions below are provided for backwards
-			 ;; compatibility. The affixation-function takes
-			 ;; priority in newer versions.
-			 :annotation-function #'renpy--completion-annotate
-			 :affixation-function #'renpy--completion-affixate)))))
+			 :exclusive 'no)))))
 
 
 ;;;; Modes.
