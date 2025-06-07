@@ -170,4 +170,28 @@ transform animated_ariana_disp:
 show expression \"my\" + \"image\" eileen at |
 "  ("left_to_right" "animated_ariana_disp"))
 
+(renpy-test-capf show-layer-at-transform
+  "transform left_to_right:
+    xalign 0.
+
+transform animated_ariana_disp:
+    \"ariana_reverse\"
+    pause 1.
+    repeat
+
+show layer testlayer at |
+"  ("left_to_right" "animated_ariana_disp"))
+
+(renpy-test-capf show-layer-at-transform-comma
+  "transform left_to_right:
+    xalign 0.
+
+transform animated_ariana_disp:
+    \"ariana_reverse\"
+    pause 1.
+    repeat
+
+show layer testlayer at left_to_right, |
+"  ("left_to_right" "animated_ariana_disp"))
+
 ;;; renpy-capf-test.el ends here

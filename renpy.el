@@ -104,7 +104,7 @@
 		      "from" "function" "global" "grid" "group" "has" "hbox"
 		      "hide" "hotbar" "hotspot" "if" "image" "imagebutton"
 		      "imagemap" "import" "in" "index" "init" "input" "is"
-		      "jump" "key" "knot" "label" "lambda" "layeredimage" "menu"
+		      "jump" "key" "knot" "label" "layer" "lambda" "layeredimage" "menu"
 		      "monologue" "mousearea" "music" "nearrect" "new"
 		      "nointeract" "nonlocal" "not" "null" "nvl" "offset" "old"
 		      "on" "onlayer" "or" "parallel" "pass" "pause" "play"
@@ -1593,7 +1593,7 @@ Uses `renpy-beginning-of-block', `renpy-end-of-block'."
 
 (defconst renpy--completion-keywords
   '("call" "jump" "show" "scene" "hide" "at" "as" "expression" "from"
-    "zorder" "onlayer" "behind" "screen")
+    "zorder" "onlayer" "behind" "screen" "layer")
   "A list of keywords that can be around a completion context point.")
 
 (defun renpy--skip-token-backward ()
@@ -1719,6 +1719,10 @@ Zero-length list counts as even."
 	    :transform)
 	   ('(show expression))
 	   ('(show screen))
+	   ((and `(show layer ,_ at . ,rest)
+		 (guard (renpy--comma-sep-p (car rest))))
+	    :transform)
+	   ('(show layer))
 	   ((and `(show ,_ at . ,rest)
 		 (guard (renpy--comma-sep-p (car rest))))
 	    :transform)

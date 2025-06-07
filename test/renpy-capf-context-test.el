@@ -53,6 +53,12 @@ show img at|
 (renpy-test-context show-expression-at-transform-comma-comma
   "show expression img at left, top, |" :transform)
 
+(renpy-test-context show-layer-at-transform
+  "show layer layer1 at |" :transform)
+
+(renpy-test-context show-layer-at-transform-comma
+  "show layer layer1 at left, |" :transform)
+
 
 ;;;; Contexts that should not trigger completion
 ;;TODO: Some of these should eventually get completion support.
@@ -193,6 +199,11 @@ show img as |
 (renpy-test-context show-screen
   "
 show screen |
+")
+
+(renpy-test-context show-layer
+  "
+show layer |
 ")
 
 ;;; renpy-capf-context-test.el ends here

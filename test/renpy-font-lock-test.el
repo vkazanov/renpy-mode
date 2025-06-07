@@ -70,6 +70,13 @@ hide eileen with dissolve
 #^^^        ^^^^ font-lock-keyword-face
 ")
 
+  (ert-font-lock-deftest test-renpy-font-lock-show-layer renpy-mode
+    "
+show layer lay111 at left
+# <- font-lock-keyword-face
+#^^^ ^^^^^        ^^ font-lock-keyword-face
+")
+
   (ert-font-lock-deftest test-renpy-font-lock-scene renpy-mode
     "
 scene bg whitehouse with fade
