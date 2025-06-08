@@ -35,6 +35,12 @@ show img at|
 (renpy-test-context scene-image
   "scene |" :image)
 
+(renpy-test-context scene-image-2
+  "scene img |" :image)
+
+(renpy-test-context scene-image-3
+  "scene img at|" :image)
+
 (renpy-test-context hide-image
   "hide |" :image)
 
@@ -90,6 +96,15 @@ show img at|
 
 (renpy-test-context jump-expression
   "jump expression |")
+
+(renpy-test-context scene-expression
+  "scene expression |")
+
+(renpy-test-context scene-onlayer
+  "scene expression |")
+
+(renpy-test-context hide-expression
+  "hide expression |")
 
 (renpy-test-context call-label-comment
   "#call |")
