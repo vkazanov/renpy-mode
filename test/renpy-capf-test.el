@@ -140,6 +140,42 @@ scene |
 "
   ("eileen happy" "black" "bg tiled"))
 
+(renpy-test-capf scene-at-transform
+  "transform left_to_right:
+    xalign 0.
+
+transform animated_ariana_disp:
+    \"ariana_reverse\"
+    pause 1.
+    repeat
+
+scene amg at |
+"  ("left_to_right" "animated_ariana_disp"))
+
+(renpy-test-capf scene-expression-at-transform
+  "transform left_to_right:
+    xalign 0.
+
+transform animated_ariana_disp:
+    \"ariana_reverse\"
+    pause 1.
+    repeat
+
+scene amg at |
+"  ("left_to_right" "animated_ariana_disp"))
+
+(renpy-test-capf scene-at-transform-comma
+  "transform left_to_right:
+    xalign 0.
+
+transform animated_ariana_disp:
+    \"ariana_reverse\"
+    pause 1.
+    repeat
+
+scene amg at transform1, |
+"  ("left_to_right" "animated_ariana_disp"))
+
 ;;;; Local transform completion
 
 (renpy-test-capf transform
