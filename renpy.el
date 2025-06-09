@@ -36,6 +36,7 @@
 ;;; Code:
 
 (require 'imenu)
+(require 'subr-x)
 
 (defgroup renpy nil
   "Major mode for editing Ren'Py files."
@@ -1703,6 +1704,45 @@ Zero-length list counts as even."
 			 (eq (pop tokens) 'comma))))
     correct))
 
+(defun renpy--completion-context-dispatch (tree)
+  "Pattern match against the TREE and return a completion context keyword."
+  ;; TODO: Maybe a DSL would be convenient to make adding contexts easy.
+  (pcase tree
+    ;; Show statement.
+    ((and `(show expression ,_ at . ,rest)
+	  (guard (renpy--comma-sep-p (car rest))))
+     :transform)
+    ('(show expression))
+    ('(show screen))
+    ((and `(show layer ,_ at . ,rest)
+	  (guard (renpy--comma-sep-p (car rest))))
+     :transform)
+    ('(show layer))
+    ((and `(show ,_ at . ,rest)
+	  (guard (renpy--comma-sep-p (car rest))))
+     :transform)
+    (`(show ,_) :image)
+    ('(show) :image)
+    ;; Scene statement.
+    ('(scene onlayer))
+    ((and `(scene expression ,_ at . ,rest)
+	  (guard (renpy--comma-sep-p (car rest))))
+     :transform)
+    ((and `(scene ,_ at . ,rest)
+	  (guard (renpy--comma-sep-p (car rest))))
+     :transform)
+    ('(scene expression))
+    (`(scene ,_) :image)
+    ('(scene) :image)
+    ;; Hide statement.
+    ('(hide expression))
+    ('(hide ,_) :image)
+    ('(hide) :image)
+    ;; Call statement.
+    ('(call) :label)
+    ;; Jump statement.
+    ('(jump) :label)))
+
 (defun renpy--completion-context ()
   "Return the completion context keyword symbol at point."
   ;; TODO: Currently the context is defined as "not string, comment, python",
@@ -1713,36 +1753,10 @@ Zero-length list counts as even."
        (save-excursion
 	 ;; Flush the existing prefix.
 	 (skip-syntax-backward "w_.")
-	 (pcase (renpy--tokens-to-tree (renpy--parse-backwards-line))
-	   ((and `(show expression ,_ at . ,rest)
-		 (guard (renpy--comma-sep-p (car rest))))
-	    :transform)
-	   ('(show expression))
-	   ('(show screen))
-	   ((and `(show layer ,_ at . ,rest)
-		 (guard (renpy--comma-sep-p (car rest))))
-	    :transform)
-	   ('(show layer))
-	   ((and `(show ,_ at . ,rest)
-		 (guard (renpy--comma-sep-p (car rest))))
-	    :transform)
-	   (`(show ,_) :image)
-	   ('(show) :image)
-	   ('(scene onlayer))
-	   ((and `(scene expression ,_ at . ,rest)
-		 (guard (renpy--comma-sep-p (car rest))))
-	    :transform)
-	   ((and `(scene ,_ at . ,rest)
-		 (guard (renpy--comma-sep-p (car rest))))
-	    :transform)
-	   ('(scene expression))
-	   (`(scene ,_) :image)
-	   ('(scene) :image)
-	   ('(hide expression))
-	   ('(hide ,_) :image)
-	   ('(hide) :image)
-	   ('(call) :label)
-	   ('(jump) :label)))))
+	 (thread-first
+	   (renpy--parse-backwards-line)
+	   (renpy--tokens-to-tree)
+	   (renpy--completion-context-dispatch)))))
 
 (defvar-local renpy--collect-cache nil
   "Alist of (KIND TICK SYMBOL) for cached Ren’Py completion in this buffer.")
