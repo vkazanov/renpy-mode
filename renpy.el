@@ -1698,50 +1698,60 @@ tree is meant to simplify use for pattern matching."
   "Check that TOKENS s a list of strings separated by a `comma' symbol.
 To be valid the TOKENS list should have an even number of elements.
 Zero-length list counts as even."
-  (let ((correct t))
+  (let ((correct (not (symbolp tokens))))
     (while (and tokens correct)
       (setq correct (and (stringp (pop tokens))
 			 (eq (pop tokens) 'comma))))
     correct))
 
+(defun renpy--first-keyword (tokens)
+  "Return the first keyword (a symbol) in the TOKENS list."
+  (while (not (symbolp (car tokens)))
+    (setq tokens (cdr tokens)))
+  (car tokens))
+
+(defun renpy--string-list-p (arg)
+  "Check if ARG is a list of strings."
+  (while (and (consp arg) (stringp (car arg)))
+    (setq arg (cdr arg)))
+  (null arg))
+
+(defun renpy--keyword-comma-sep-p (target prev-keyword prev)
+  "True if PREV-KEYWORD is TARGET followed by a comma-separated list.
+TARGET is a symbol representing the keyword.  PREV-KEYWORD is the
+previous keyword on the line.  PREV is the immediately preceeding token,
+possiblity a comma-separated list of strings."
+  (and (eq prev-keyword target)
+       (or (eq prev prev-keyword)
+	   (renpy--comma-sep-p prev))))
+
 (defun renpy--completion-context-dispatch (tree)
   "Pattern match against the TREE and return a completion context keyword."
   ;; TODO: Maybe a DSL would be convenient to make adding contexts easy.
-  (pcase tree
-    ;; Show statement.
-    ((and `(show expression ,_ at . ,rest)
-	  (guard (renpy--comma-sep-p (car rest))))
-     :transform)
-    ('(show expression))
-    ('(show screen))
-    ((and `(show layer ,_ at . ,rest)
-	  (guard (renpy--comma-sep-p (car rest))))
-     :transform)
-    ('(show layer))
-    ((and `(show ,_ at . ,rest)
-	  (guard (renpy--comma-sep-p (car rest))))
-     :transform)
-    (`(show ,_) :image)
-    ('(show) :image)
-    ;; Scene statement.
-    ('(scene onlayer))
-    ((and `(scene expression ,_ at . ,rest)
-	  (guard (renpy--comma-sep-p (car rest))))
-     :transform)
-    ((and `(scene ,_ at . ,rest)
-	  (guard (renpy--comma-sep-p (car rest))))
-     :transform)
-    ('(scene expression))
-    (`(scene ,_) :image)
-    ('(scene) :image)
-    ;; Hide statement.
-    ('(hide expression))
-    ('(hide ,_) :image)
-    ('(hide) :image)
-    ;; Call statement.
-    ('(call) :label)
-    ;; Jump statement.
-    ('(jump) :label)))
+  (let* ((first-keyword (car tree))
+	 (rest (cdr tree))
+	 (rev-tree (reverse rest))
+	 (prev (car rev-tree))
+	 (prev-keyword (renpy--first-keyword rev-tree)))
+    (pcase first-keyword
+      ;; Show statement.
+      ('show
+       (pcase rest
+	 ((guard (renpy--keyword-comma-sep-p 'at prev-keyword prev)) :transform)
+	 ((or '() (and `(,l) (guard (renpy--string-list-p l)))) :image)))
+      ;; Scene statement.
+      ('scene
+       (pcase rest
+	 ((guard (renpy--keyword-comma-sep-p 'at prev-keyword prev)) :transform)
+	 ((or '() (and `(,l) (guard (renpy--string-list-p l)))) :image)))
+      ;; Hide statement.
+      ('hide
+       (pcase rest
+	 ((or '() (and `(,l) (guard (renpy--string-list-p l)))) :image)))
+      ;; Call statement.
+      ((and 'call (guard (null rest))) :label)
+      ;; Jump statement.
+      ((and 'jump (guard (null rest))) :label))))
 
 (defun renpy--completion-context ()
   "Return the completion context keyword symbol at point."
