@@ -1719,8 +1719,8 @@ Zero-length list counts as even."
 (defun renpy--keyword-comma-sep-p (target prev-keyword prev)
   "True if PREV-KEYWORD is TARGET followed by a comma-separated list.
 TARGET is a symbol representing the keyword.  PREV-KEYWORD is the
-previous keyword on the line.  PREV is the immediately preceeding token,
-possiblity a comma-separated list of strings."
+previous keyword on the line.  PREV is the immediately preceding token,
+possibly a comma-separated list of strings."
   (and (eq prev-keyword target)
        (or (eq prev prev-keyword)
 	   (renpy--comma-sep-p prev))))
@@ -1736,22 +1736,20 @@ possiblity a comma-separated list of strings."
     (pcase first-keyword
       ;; Show statement.
       ('show
-       (pcase rest
-	 ((guard (renpy--keyword-comma-sep-p 'at prev-keyword prev)) :transform)
-	 ((or '() (and `(,l) (guard (renpy--string-list-p l)))) :image)))
+       (cond
+	((renpy--keyword-comma-sep-p 'at prev-keyword prev) :transform)
+	((and (<= (length rest) 1) (renpy--string-list-p (car rest))) :image)))
       ;; Scene statement.
       ('scene
-       (pcase rest
-	 ((guard (renpy--keyword-comma-sep-p 'at prev-keyword prev)) :transform)
-	 ((or '() (and `(,l) (guard (renpy--string-list-p l)))) :image)))
+       (cond
+	((renpy--keyword-comma-sep-p 'at prev-keyword prev) :transform)
+	((and (<= (length rest) 1) (renpy--string-list-p (car rest))) :image)))
       ;; Hide statement.
-      ('hide
-       (pcase rest
-	 ((or '() (and `(,l) (guard (renpy--string-list-p l)))) :image)))
+      ('hide (and (<= (length rest) 1) (renpy--string-list-p (car rest)) :image))
       ;; Call statement.
-      ((and 'call (guard (null rest))) :label)
+      ('call (and (null rest) :label))
       ;; Jump statement.
-      ((and 'jump (guard (null rest))) :label))))
+      ('jump (and (null rest) :label)))))
 
 (defun renpy--completion-context ()
   "Return the completion context keyword symbol at point."
