@@ -1594,7 +1594,7 @@ Uses `renpy-beginning-of-block', `renpy-end-of-block'."
 
 (defconst renpy--completion-keywords
   '("call" "jump" "show" "scene" "hide" "at" "as" "expression" "from"
-    "zorder" "onlayer" "behind" "screen" "layer")
+    "zorder" "onlayer" "behind" "screen" "layer" "with")
   "A list of keywords that can be around a completion context point.")
 
 (defun renpy--skip-token-backward ()
@@ -1729,8 +1729,8 @@ possibly a comma-separated list of strings."
   "Pattern match against the TREE and return a completion context keyword."
   ;; TODO: Maybe a DSL would be convenient to make adding contexts easy.
   ;; TODO: :image-tag is not handled for now.  Collection is easy to add.
-  ;; TODO: add with_expression to scene,show,hide.  Note that "show layer" does
-  ;; have the with clause.  Use a predefined list of known transitions + None.
+  ;; TODO: Note that "show layer" does not have the "with" clause.  Use a
+  ;; predefined list of known transitions + None.
   (let* ((first-keyword (car tree))
 	 (rest (cdr tree))
 	 (rev-tree (reverse rest))
@@ -1742,19 +1742,26 @@ possibly a comma-separated list of strings."
        (cond
 	((renpy--keyword-comma-sep-p 'at prev-keyword prev) :transform)
 	((renpy--keyword-comma-sep-p 'behind prev-keyword prev) :image-tag)
+	((eq prev 'with) :transition)
 	((and (<= (length rest) 1) (renpy--string-list-p prev)) :image)))
       ;; Scene statement.
       ('scene
        (cond
 	((renpy--keyword-comma-sep-p 'at prev-keyword prev) :transform)
 	((renpy--keyword-comma-sep-p 'behind prev-keyword prev) :image-tag)
+	((eq prev 'with) :transition)
 	((and (<= (length rest) 1) (renpy--string-list-p prev)) :image)))
       ;; Hide statement.
-      ('hide (and (<= (length rest) 1) (renpy--string-list-p prev) :image))
+      ('hide
+       (cond
+	((eq prev 'with) :transition)
+	((and (<= (length rest) 1) (renpy--string-list-p prev) :image))))
       ;; Call statement.
       ('call (and (null rest) :label))
       ;; Jump statement.
-      ('jump (and (null rest) :label)))))
+      ('jump (and (null rest) :label))
+      ;; With statement.
+      ('with (and (null rest) :transition)))))
 
 (defun renpy--completion-context ()
   "Return the completion context keyword symbol at point."
@@ -1765,7 +1772,18 @@ possibly a comma-separated list of strings."
   (and (renpy--completion-context-p)
        (save-excursion
 	 ;; Flush the existing prefix.
-	 (skip-syntax-backward "w_.")
+	 ;;
+	 ;; TODO: Skipping the prefix for all context works for now this might
+	 ;; lead to problems related to how different contexts might have
+	 ;; different understandings of what a prefix is (word, word+puntuation,
+	 ;; multiple words).  So the parsing function should see every token,
+	 ;; and then we can skip prefixes in a context-specific way.
+	 ;;
+	 ;; NOTE: Skip global_label.local_label prefixes: 2 symbols separated by
+	 ;; a dot.
+	 (skip-syntax-backward "w_")
+	 (skip-chars-backward ".")
+	 (skip-syntax-backward "w_")
 	 (thread-first
 	   (renpy--parse-backwards-line)
 	   (renpy--tokens-to-tree)
@@ -1858,6 +1876,28 @@ PREFIX is a completion text to be passed into the collecting function."
             (push str results))))
       results)))
 
+;; TODO: Also add transition classes?
+;; Extracted from https://www.renpy.org/doc/html/transitions.html.
+(defconst renpy--predefined-transitions
+  '("dissolve" "fade" "pixellate"
+    "move" "moveinright" "moveinleft" "moveintop" "moveinbottom"
+    "moveoutright" "ease" "moveoutleft" "moveouttop" "moveoutbottom"
+    "ease" "easeinright" "easeinleft" "easeintop" "easeinbottom"
+    "easeoutright" "easeoutleft" "easeouttop" "easeoutbottom"
+    "zoomin" "zoomout" "zoominout"
+    "vpunch" "hpunch" "blinds" "squares"
+    "wipeleft" "wiperight" "wipeup" "wipedown"
+    "slideleft" "slideright" "slideup" "slidedown"
+    "slideawayleft" "slideawayright" "slideawayup" "slideawaydown"
+    "pushright" "pushleft" "pushup" "pushdown"
+    "irisin" "None"
+    )
+  "A list of predefined transitions.")
+
+(defun renpy--collect-transitions (&optional _)
+  "Return predefined transitions."
+  renpy--predefined-transitions)
+
 (defun renpy-completion-at-point ()
   "Provide completion data for the symbol at point in Ren'Py buffers."
   (save-restriction
@@ -1896,7 +1936,16 @@ PREFIX is a completion text to be passed into the collecting function."
 	       beg (save-excursion
 		     (skip-syntax-backward "w_")
 		     (point))
-	       collect #'renpy--collect-transforms-cached)))
+	       collect #'renpy--collect-transforms-cached))
+	(:transition
+	 ;; Transitions are words + symbol constituents.
+	 (setq end (save-excursion
+		     (skip-syntax-forward "w_")
+		     (point))
+	       beg (save-excursion
+		     (skip-syntax-backward "w_")
+		     (point))
+	       collect #'renpy--collect-transitions)))
       (and collect (list beg end
 			 (completion-table-dynamic collect)
 			 ;; TODO: Once we know the precise context, other completion

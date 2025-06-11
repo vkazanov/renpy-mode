@@ -41,11 +41,29 @@ show img at|
 (renpy-test-context scene-at
   "scene img at|" :image)
 
+(renpy-test-context scene-at-2
+  "scene img at |" :transform)
+
+(renpy-test-context scene-with
+  "scene img with |" :transition)
+
+(renpy-test-context scene-with-2
+  "scene img with dissolve,|")
+
+(renpy-test-context scene-with-3
+  "scene img with dissolve |")
+
+(renpy-test-context scene-with-4
+  "scene img with dissolve|" :transition)
+
 (renpy-test-context scene-behind
   "scene img behind |" :image-tag)
 
 (renpy-test-context hide-image
   "hide |" :image)
+
+(renpy-test-context hide-image-with
+  "hide img with |" :transition)
 
 (renpy-test-context show-behind
   "
@@ -61,6 +79,21 @@ show img behind img1|
   "
 show img behind img1,|
 " :image-tag)
+
+(renpy-test-context show-with
+  "
+show img with|
+" :image)
+
+(renpy-test-context show-with-2
+  "
+show img with |
+" :transition)
+
+(renpy-test-context show-with-3
+  "
+show img behind img1 with dissolve |
+")
 
 (renpy-test-context at-transform
   "show img at |" :transform)
@@ -83,6 +116,11 @@ show img behind img1,|
 (renpy-test-context show-layer-at-transform-comma
   "show layer layer1 at left, |" :transform)
 
+(renpy-test-context with
+  "with |" :transition)
+
+(renpy-test-context with-2
+  "with dissolve,|")
 
 ;;;; Contexts that should not trigger completion
 ;;TODO: Some of these should eventually get completion support.

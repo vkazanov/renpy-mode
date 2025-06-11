@@ -62,6 +62,8 @@ The plan:
 
   - [ ] hide, etc only need a tag? check in the parser
 
+- [ ] show/hide/call screen statement full support
+
 - [ ] image directory completion
 
 - [ ] keyword completion
