@@ -1728,6 +1728,9 @@ possibly a comma-separated list of strings."
 (defun renpy--completion-context-dispatch (tree)
   "Pattern match against the TREE and return a completion context keyword."
   ;; TODO: Maybe a DSL would be convenient to make adding contexts easy.
+  ;; TODO: :image-tag is not handled for now.  Collection is easy to add.
+  ;; TODO: add with_expression to scene,show,hide.  Note that "show layer" does
+  ;; have the with clause.  Use a predefined list of known transitions + None.
   (let* ((first-keyword (car tree))
 	 (rest (cdr tree))
 	 (rev-tree (reverse rest))
@@ -1738,14 +1741,16 @@ possibly a comma-separated list of strings."
       ('show
        (cond
 	((renpy--keyword-comma-sep-p 'at prev-keyword prev) :transform)
-	((and (<= (length rest) 1) (renpy--string-list-p (car rest))) :image)))
+	((renpy--keyword-comma-sep-p 'behind prev-keyword prev) :image-tag)
+	((and (<= (length rest) 1) (renpy--string-list-p prev)) :image)))
       ;; Scene statement.
       ('scene
        (cond
 	((renpy--keyword-comma-sep-p 'at prev-keyword prev) :transform)
-	((and (<= (length rest) 1) (renpy--string-list-p (car rest))) :image)))
+	((renpy--keyword-comma-sep-p 'behind prev-keyword prev) :image-tag)
+	((and (<= (length rest) 1) (renpy--string-list-p prev)) :image)))
       ;; Hide statement.
-      ('hide (and (<= (length rest) 1) (renpy--string-list-p (car rest)) :image))
+      ('hide (and (<= (length rest) 1) (renpy--string-list-p prev) :image))
       ;; Call statement.
       ('call (and (null rest) :label))
       ;; Jump statement.

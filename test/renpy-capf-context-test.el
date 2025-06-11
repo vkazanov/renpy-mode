@@ -38,11 +38,29 @@ show img at|
 (renpy-test-context scene-image-2
   "scene img |" :image)
 
-(renpy-test-context scene-image-3
+(renpy-test-context scene-at
   "scene img at|" :image)
+
+(renpy-test-context scene-behind
+  "scene img behind |" :image-tag)
 
 (renpy-test-context hide-image
   "hide |" :image)
+
+(renpy-test-context show-behind
+  "
+show img behind |
+" :image-tag)
+
+(renpy-test-context show-behind-2
+  "
+show img behind img1|
+" :image-tag)
+
+(renpy-test-context show-behind-3
+  "
+show img behind img1,|
+" :image-tag)
 
 (renpy-test-context at-transform
   "show img at |" :transform)
@@ -194,11 +212,6 @@ hide screen |
 (renpy-test-context show-onlayer
 		    "
 show img onlayer |
-")
-
-(renpy-test-context show-behind
-  "
-show img behind |
 ")
 
 (renpy-test-context show-zorder
