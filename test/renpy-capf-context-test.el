@@ -14,6 +14,9 @@
 (renpy-test-context call-label
   "call |" :label)
 
+(renpy-test-context call-label-2
+  "call screen|" :label)
+
 (renpy-test-context jump-label
   "jump |" :label)
 
@@ -30,6 +33,16 @@ show img as|
 (renpy-test-context show-image-3
   "
 show img at|
+" :image)
+
+(renpy-test-context show-image-4
+  "
+show screen|
+" :image)
+
+(renpy-test-context show-image-5
+  "
+show expression|
 " :image)
 
 (renpy-test-context scene-image
@@ -61,6 +74,12 @@ show img at|
 
 (renpy-test-context hide-image
   "hide |" :image)
+
+(renpy-test-context hide-image-2
+  "hide screen|" :image)
+
+(renpy-test-context hide-image-3
+  "hide expression|" :image)
 
 (renpy-test-context hide-image-with
   "hide img with |" :transition)

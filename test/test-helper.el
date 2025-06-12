@@ -72,4 +72,15 @@ the point is as this should affect the results."
 	   (narrow-to-region (point) (point))
 	   ,test-body)))))
 
+;;; NOTE: Meant to be used manually.
+(defun renpy-print-context-and-forward-char ()
+  "Return the completion context symbol at point and move forward."
+  (interactive nil renpy-mode)
+  (unless (eq major-mode 'renpy-mode)
+    (user-error "Not in `renpy-mode'"))
+  (while t
+    (message "Context: %s"(renpy--completion-context))
+    (read-char)
+    (forward-char)))
+
 ;;; test-helper.el ends here

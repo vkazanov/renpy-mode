@@ -22,6 +22,8 @@
 
 - [ ] indentation tests
 
+- [ ] check multiline strings and expressions (renpy is special here)
+
 - [ ] automated testing with multiple emacs versions
 
 * Xref support
@@ -64,6 +66,8 @@ The plan:
 
 - [ ] show/hide/call screen statement full support
 
+- [ ] list all the statements that the mode can support
+
 - [ ] image directory completion
 
 - [ ] keyword completion
@@ -71,6 +75,9 @@ The plan:
 - [ ] project buffer completion
 
 - [ ] global completion (navigation.json?)
+
+- [ ] make the completion/xref backend customizable: buffer-local, open buffers,
+  project-wide search
 
 ** Further notes
 
@@ -134,5 +141,7 @@ Key VSCode plugin implementation points:
 * Publishing
 
 - [ ] rename to renpy-mode (also in Melpa)
+
+- [ ] update the readme
 
 - [ ] reannounce the package (once enough features are ready)
