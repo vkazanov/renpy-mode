@@ -19,16 +19,18 @@
 
 (defmacro renpy-test-context (name code &optional expected)
   "Create an ERT test called NAME.
-CODE is a code fragment where ‘|’ marks the point where completion is
+CODE is a code fragment where ‘|’ mark points where completion is
 requested.  EXPECTED is the keyword symbol that
-`renpy--completion-context' should return at the point.  If EXPECTED is
-nil then no context should be found."
+`renpy--completion-context' should return at the point.  EXPECTED can be
+nil for no context."
   (declare (indent 1) (debug t))
   `(ert-deftest ,(intern (format "test-renpy-completion-context-%s" name)) ()
      (with-temp-buffer-str ,code
-       (search-forward "|" nil t)
-       (delete-char -1)
-       (should (equal (renpy--completion-context) ,expected)))))
+       (while (search-forward "|" nil t)
+	 (delete-char -1)
+	 (ert-info ((format "Context %s not found on line %d in: \n%s"
+			    ,expected (line-number-at-pos) ,code))
+	   (should (equal (renpy--completion-context) ,expected)))))))
 
 (defmacro renpy-test-capf (name code &optional expected)
   "Create an ERT test called NAME.
