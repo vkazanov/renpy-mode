@@ -105,16 +105,17 @@
 		      "from" "function" "global" "grid" "group" "has" "hbox"
 		      "hide" "hotbar" "hotspot" "if" "image" "imagebutton"
 		      "imagemap" "import" "in" "index" "init" "input" "is"
-		      "jump" "key" "knot" "label" "lambda" "layeredimage" "menu"
-		      "monologue" "mousearea" "music" "nearrect" "new"
-		      "nointeract" "nonlocal" "not" "null" "nvl" "offset" "old"
-		      "on" "onlayer" "or" "parallel" "pass" "pause" "play"
-		      "python" "queue" "raise" "repeat" "return" "rpy" "scene"
-		      "screen" "show" "showif" "side" "sound" "stop" "strings"
-		      "style" "sustain" "tag" "take" "testcase" "text"
-		      "textbutton" "time" "timer" "transclude" "transform"
-		      "translate" "try" "use" "vbar" "vbox" "viewport" "voice"
-		      "vpgrid" "while" "window" "with" "yield" "zorder")
+		      "jump" "key" "knot" "label" "lambda" "layer"
+		      "layeredimage" "menu" "monologue" "mousearea" "music"
+		      "nearrect" "new" "nointeract" "nonlocal" "not" "null"
+		      "nvl" "offset" "old" "on" "onlayer" "or" "parallel" "pass"
+		      "pause" "play" "python" "queue" "raise" "repeat" "return"
+		      "rpy" "scene" "screen" "show" "showif" "side" "sound"
+		      "stop" "strings" "style" "sustain" "tag" "take" "testcase"
+		      "text" "textbutton" "time" "timer" "transclude"
+		      "transform" "translate" "try" "use" "vbar" "vbox"
+		      "viewport" "voice" "vpgrid" "while" "window" "with"
+		      "yield" "zorder")
 		  symbol-end))
 	    ;; Classes and functions from
 	    ;; https://www.renpy.org/doc/html/py-function-class-index.html.
