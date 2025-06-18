@@ -57,8 +57,8 @@ transform fade_in:
     linear 0.5 alpha 1.0
 "
     (let* ((index-alist (funcall imenu-create-index-function))
-	  (style-alist (alist-get "/style" index-alist nil nil #'string-equal))
-	  (transform-alist (alist-get "/transform" index-alist nil nil #'string-equal)))
+	   (style-alist (alist-get "/style" index-alist nil nil #'string-equal))
+	   (transform-alist (alist-get "/transform" index-alist nil nil #'string-equal)))
       (should (equal (length index-alist) 2))
       (should style-alist)
       (should transform-alist)

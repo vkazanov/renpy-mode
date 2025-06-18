@@ -323,50 +323,51 @@
     ;; `__builtin__.__dict__.keys()' in Python 2.7)  These patterns
     ;; are debatable, but they at least help to spot possible
     ;; shadowing of builtins.
-    (,(rx symbol-start (or
-	  ;; exceptions
-	  "ArithmeticError" "AssertionError" "AttributeError"
-	  "BaseException" "DeprecationWarning" "EOFError"
-	  "EnvironmentError" "Exception" "FloatingPointError"
-	  "FutureWarning" "GeneratorExit" "IOError" "ImportError"
-	  "ImportWarning" "IndentationError" "IndexError" "KeyError"
-	  "KeyboardInterrupt" "LookupError" "MemoryError" "NameError"
-	  "NotImplemented" "NotImplementedError" "OSError"
-	  "OverflowError" "PendingDeprecationWarning" "ReferenceError"
-	  "RuntimeError" "RuntimeWarning" "StandardError"
-	  "StopIteration" "SyntaxError" "SyntaxWarning" "SystemError"
-	  "SystemExit" "TabError" "TypeError" "UnboundLocalError"
-	  "UnicodeDecodeError" "UnicodeEncodeError" "UnicodeError"
-	  "UnicodeTranslateError" "UnicodeWarning" "UserWarning"
-	  "ValueError" "Warning" "ZeroDivisionError"
-	  ;; Python 2.7
-	  "BufferError" "BytesWarning" "WindowsError")
+    (,(rx symbol-start
+	  (or
+	   ;; exceptions
+	   "ArithmeticError" "AssertionError" "AttributeError" "BaseException"
+	   "DeprecationWarning" "EOFError" "EnvironmentError" "Exception"
+	   "FloatingPointError" "FutureWarning" "GeneratorExit" "IOError"
+	   "ImportError" "ImportWarning" "IndentationError" "IndexError"
+	   "KeyError" "KeyboardInterrupt" "LookupError" "MemoryError"
+	   "NameError" "NotImplemented" "NotImplementedError" "OSError"
+	   "OverflowError" "PendingDeprecationWarning" "ReferenceError"
+	   "RuntimeError" "RuntimeWarning" "StandardError" "StopIteration"
+	   "SyntaxError" "SyntaxWarning" "SystemError" "SystemExit" "TabError"
+	   "TypeError" "UnboundLocalError" "UnicodeDecodeError"
+	   "UnicodeEncodeError" "UnicodeError" "UnicodeTranslateError"
+	   "UnicodeWarning" "UserWarning" "ValueError" "Warning"
+	   "ZeroDivisionError"
+	   ;; Python 2.7
+	   "BufferError" "BytesWarning" "WindowsError")
 	  symbol-end)
      . font-lock-type-face)
     (,(rx (or line-start (not (any ". \t"))) (* (any " \t")) symbol-start
-	  (group (or
-	  ;; callable built-ins, fontified when not appearing as
-	  ;; object attributes
-	  "abs" "all" "any" "apply" "basestring" "bool" "buffer" "callable"
-	  "chr" "classmethod" "cmp" "coerce" "compile" "complex"
-	  "copyright" "credits" "delattr" "dict" "dir" "divmod"
-	  "enumerate" "eval" "execfile" "exit" "file" "filter" "float"
-	  "frozenset" "getattr" "globals" "hasattr" "hash" "help"
-	  "hex" "id" "input" "int" "intern" "isinstance" "issubclass"
-	  "iter" "len" "license" "list" "locals" "long" "map" "max"
-	  "min" "object" "oct" "open" "ord" "pow" "property" "quit"
-	  "range" "raw_input" "reduce" "reload" "repr" "reversed"
-	  "round" "set" "setattr" "slice" "sorted" "staticmethod"
-	  "str" "sum" "super" "tuple" "type" "unichr" "unicode" "vars"
-	  "xrange" "zip"
-	  ;; Python 2.7.
-	  "bin" "bytearray" "bytes" "format" "memoryview" "next" "print"))
+	  (group
+	   (or
+	    ;; callable built-ins, fontified when not appearing as object
+	    ;; attributes.
+	    "abs" "all" "any" "apply" "basestring" "bool" "buffer" "callable"
+	    "chr" "classmethod" "cmp" "coerce" "compile" "complex" "copyright"
+	    "credits" "delattr" "dict" "dir" "divmod" "enumerate" "eval"
+	    "execfile" "exit" "file" "filter" "float" "frozenset" "getattr"
+	    "globals" "hasattr" "hash" "help" "hex" "id" "input" "int" "intern"
+	    "isinstance" "issubclass" "iter" "len" "license" "list" "locals"
+	    "long" "map" "max" "min" "object" "oct" "open" "ord" "pow"
+	    "property" "quit" "range" "raw_input" "reduce" "reload" "repr"
+	    "reversed" "round" "set" "setattr" "slice" "sorted" "staticmethod"
+	    "str" "sum" "super" "tuple" "type" "unichr" "unicode" "vars"
+	    "xrange" "zip"
+	    ;; Python 2.7.
+	    "bin" "bytearray" "bytes" "format" "memoryview" "next" "print"))
 	  symbol-end)
      (1 font-lock-builtin-face))
-    (,(rx symbol-start (or
-	  ;; other built-ins
-	  "True" "False" "None" "Ellipsis"
-	  "_" "__debug__" "__doc__" "__import__" "__name__" "__package__")
+    (,(rx symbol-start
+	  (or
+	   ;; other built-ins
+	   "True" "False" "None" "Ellipsis"
+	   "_" "__debug__" "__doc__" "__import__" "__name__" "__package__")
 	  symbol-end)
      . font-lock-builtin-face)
     ;; Ren'Py 8.0.3
@@ -814,7 +815,7 @@ Set `renpy-indent' locally to the value guessed."
 		    ;; following a key.
 		    (if (or backslash colon)
 			(+ renpy-indent (current-column))
-			(current-column))
+		      (current-column))
 		  ;; Otherwise indent relative to statement start, one
 		  ;; level per bracketing level.
 		  (goto-char (1+ open-start))
@@ -1065,7 +1066,7 @@ reached start of buffer."
 		     ;; Not sure why it was like this -- fails in case of
 		     ;; last internal function followed by first
 		     ;; non-def statement of the main body.
-;; 		     (and def-line (= in ci))
+		     ;; (and def-line (= in ci))
 		     (= in ci)
 		     (< in ci)))
 	       (not (renpy-in-string-comment)))
@@ -1241,12 +1242,12 @@ Otherwise return non-nil."
 	    (not (goto-char point))	; return nil
 	  ;; Look upwards for less indented statement.
 	  (if (catch 'done
-;; This is slower than the below.
-;; 	  (while (zerop (renpy-previous-statement))
-;; 	    (when (and (< (current-indentation) ci)
-;; 		       (renpy-open-block-statement-p t))
-;; 	      (beginning-of-line)
-;; 	      (throw 'done t)))
+		;; This is slower than the below.
+		;; (while (zerop (renpy-previous-statement))
+		;;   (when (and (< (current-indentation) ci)
+		;;              (renpy-open-block-statement-p t))
+		;;     (beginning-of-line)
+		;;     (throw 'done t)))
 		(while (and (zerop (forward-line -1)))
 		  (when (and (< (current-indentation) ci)
 			     (not (renpy-comment-line-p))
