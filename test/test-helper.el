@@ -76,6 +76,23 @@ The test is executed twice: as is and with narrowing around the point."
 	   (narrow-to-region (point) (point))
 	   ,test-body)))))
 
+(defmacro renpy-test-bounds (name insert-text search-text bounds-func expected-value)
+  "Create an ERT test NAME to check the bounds returned by BOUNDS-FUNC.
+NAME is the test name.  INSERT-TEXT is the text to be inserted into the
+buffer.  SEARCH-TEXT is the text to search for in the buffer.
+BOUNDS-FUNC is the function used to find the bounds, and EXPECTED-VALUE
+is the expected string within the bounds."
+  (declare (indent 1) (debug t))
+  `(ert-deftest ,name ()
+     (with-temp-buffer
+       (insert ,insert-text)
+       (goto-char (point-min))
+       (search-forward ,search-text)
+       (let* ((bounds (,bounds-func))
+              (beg (car bounds)) (end (cdr bounds))
+              (result (buffer-substring-no-properties beg end)))
+         (should (string= result ,expected-value))))))
+
 ;;; NOTE: Meant to be used manually.
 (defun renpy-print-context-and-forward-char ()
   "Return the completion context symbol at point and move forward."

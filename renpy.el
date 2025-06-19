@@ -1924,25 +1924,26 @@ PREFIX is a completion text to be passed into the collecting function."
   (renpy--collect-cached 'screens #'renpy--collect-screens))
 
 (defun renpy--find-symbol-bounds (syntax-classes)
-  "Find the beginning and end of a symbol using SYNTAX-CLASSES."
-  (let (beg end)
-    (setq end (save-excursion
-                (skip-syntax-forward syntax-classes)
-                (point))
-          beg (save-excursion
-                (skip-syntax-backward syntax-classes)
-                (point)))
-    (cons beg end)))
+  "Find the beginning and end of a symbol using SYNTAX-CLASSES.
+Return a (BEG . END) pair."
+  (cons (save-excursion
+          (skip-syntax-backward syntax-classes)
+          (point))
+	(save-excursion
+          (skip-syntax-forward syntax-classes)
+          (point))))
 
 (defun renpy--find-image-bounds ()
-  "Find the beginning and end of an image name."
+  "Find the beginning and end of an image name.
+Use enclosing keywords to find image name symbol bounds.  Return a (BEG
+. END) pair."
   (cons (save-excursion
-          (renpy--skip-to-keyword-forward)
-          (point))
-        (save-excursion
           ;; NOTE: The list of keywords below should take all
           ;; contexts expecting images into account.
           (renpy--skip-to-keyword-backward '("show" "hide" "scene"))
+          (point))
+	(save-excursion
+          (renpy--skip-to-keyword-forward)
           (point))))
 
 (defun renpy-completion-at-point ()
