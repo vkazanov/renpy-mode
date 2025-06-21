@@ -44,6 +44,12 @@
   :prefix "renpy-"
   :group 'languages
   :link '(emacs-commentary-link "renpy"))
+
+(defcustom renpy-program '"renpy"
+  "Command that invokes Ren'Py."
+  :type 'string
+  :group 'renpy)
+
 
 ;;;###autoload
 (add-to-list 'auto-mode-alist '("\\.rpym?\\'" . renpy-mode))
@@ -1984,21 +1990,25 @@ Use enclosing keywords to find image name symbol bounds.  Return a (BEG
 
 ;;;; Flymake
 
-(defcustom renpy-flymake-command '("renpy")
-  "Command that invokes Ren'Py."
-  :type '(repeat string)
-  :group 'renpy)
-
-(defcustom renpy-enable-flymake t
-  "If non-nil, register a Ren'py-specific Flymake backend."
-  :type 'boolean
-  :group 'renpy)
-
 (defvar renpy--flymake-regex-list
-  '(;; Example: path/to/scrip.rpy:111 Error message
-    "^\\([^:\n]+\\):\\([0-9]+\\) \\(.*\\)$"
-    ;; Example: File \"path/to/file/script.rpy\", line 27: expected statement.
-    "^File \"\\([^\"]+\\)\", line \\([0-9]+\\): \\(.*\\)$")
+  (list
+   ;; Example: path/to/scrip.rpy:111 Error message
+   (rx bol
+       (group (1+ (not (any ?: "\n"))))
+       ":"
+       (group (1+ digit))
+       " "
+       (group (0+ (not "\n")))
+       eol)
+   ;; Example: File \"path/to/file/script.rpy\", line 27: expected statement.
+   (rx "File "
+       "\""
+       (group (1+ (not "\"")) )
+       "\", line "
+       (group (1+ digit))
+       ": "
+       (group (0+ (not "\n")))
+       eol))
   "Regexps used to catch renpy lint errors/warnings.")
 
 (defvar-local renpy--flymake-proc nil
@@ -2029,8 +2039,8 @@ Return a list of Flymake diagnostics."
 (defun renpy--flymake-backend (report-fn &rest _args)
   "Ren'Py Flymake backend.
 REPORT-FN - function used to report diagnostics."
-  (unless (executable-find (car renpy-flymake-command))
-    (error "Cannot find `%s` executable" (car renpy-flymake-command)))
+  (unless (executable-find renpy-program)
+    (error "Cannot find `%s` executable" renpy-program))
   (let* ((root (renpy--find-project-root)))
     (if (not root)
         (progn
@@ -2045,7 +2055,7 @@ REPORT-FN - function used to report diagnostics."
             (make-process
              :name "renpy-flymake"
              :buffer (generate-new-buffer "*renpy-flymake*")
-             :command (append renpy-flymake-command (list root "lint"))
+             :command (list renpy-program root "lint")
              :noquery t
              :sentinel
              (lambda (p _event)
@@ -2135,8 +2145,12 @@ with skeleton expansions for compound statement templates.
     (add-hook 'completion-at-point-functions
 	      #'renpy-completion-at-point nil t))
 
-  (when renpy-enable-flymake
-    (add-hook 'flymake-diagnostic-functions #'renpy--flymake-backend nil t)))
+  ;; Setup the Flymake backend.
+  (add-hook 'flymake-diagnostic-functions #'renpy--flymake-backend nil t)
+  ;; NOTE: No need to check buffer state at all as the linter works with all
+  ;; project files.
+  (setq-local flymake-no-changes-timeout nil))
+
 
 
 ;; Not done automatically in Emacs 21 or 22.

@@ -44,4 +44,20 @@
       (when (buffer-live-p output-buffer)
         (kill-buffer output-buffer)))))
 
+(ert-deftest renpy--parse-lint-buffer-more-cases-test ()
+  (let ((output-buffer (generate-new-buffer "*renpy-lint-output*")))
+    (unwind-protect
+        (progn
+          (with-current-buffer output-buffer
+            (insert
+             "game/script.rpy:43 This jump is to nonexistent label 'foo'.\n"
+             "my script.rpy:5 Unknown statement.\n"
+             "game/data.rpy:4 The image 'button idle' is not used.\n"
+	     "script.rpy:20 Something bad happened:\n    Extra information here.\n"
+             "script.rpy:0 Error at the beginning of the file.\n"))
+          (let ((diags (renpy--parse-lint-buffer output-buffer)))
+            (should (= (length diags) 5))))
+      (when (buffer-live-p output-buffer)
+        (kill-buffer output-buffer)))))
+
 ;;; renpy-flymake-test.el ends here
