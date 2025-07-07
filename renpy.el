@@ -1990,7 +1990,7 @@ Use enclosing keywords to find image name symbol bounds.  Return a (BEG
 
 ;;;; Flymake
 
-(defconst renpy--flymake-regex
+(defconst renpy--error-regex
   (rx
    ;; Group 1 - path to file.
    ;; Group 2 - line.
@@ -2030,7 +2030,7 @@ Return a list of Flymake diagnostics."
   (with-current-buffer buffer
     (goto-char (point-min))
     (let (diags)
-      (while (re-search-forward renpy--flymake-regex nil t)
+      (while (re-search-forward renpy--error-regex nil t)
         (let ((filename (match-string 1))
 	      (line (string-to-number (match-string 2)))
 	      (msg (match-string 3)))
@@ -2068,6 +2068,60 @@ REPORT-FN - function used to report diagnostics."
     (flymake-log
      :error "Ren'Py project root not found for buffer %s" (buffer-name))
     (funcall report-fn nil)))
+
+;;;; Run Renpy
+
+(add-to-list 'compilation-error-regexp-alist-alist
+	     `(renpy ,renpy--error-regex 1 2))
+
+(add-to-list 'compilation-error-regexp-alist 'renpy)
+
+(defvar renpy--call-history nil
+  "History of `renpy-call-with-args' command arguments.")
+
+(defun renpy-call-with-args (arguments)
+  "Run Ren'Py in the game directory using the string ARGUMENTS.
+Any individual argument within the ARGUMENTS string should be quoted if
+it contain spaces."
+  (interactive
+   (list (read-from-minibuffer
+	  "Ren'Py command arguments: "
+	  nil nil nil 'renpy--call-history)))
+  (unless (executable-find renpy-program)
+    (user-error "Cannot find `%s' executable" renpy-program))
+  (if-let* ((default-directory
+	     (or (renpy--find-game-directory)
+		 (and (not noninteractive)
+		      (read-directory-name "Ren'Py game directory: ")))))
+      (let ((compilation-buffer-name-function
+	     (lambda (_)
+	       (concat
+		"*Ren'Py "
+		(if (string-match (rx (1+ (not whitespace))) arguments)
+		    (match-string 0 arguments)
+		  "run")
+		"*")))
+	    ;; Avoid permanently setting compile-command.
+	    compile-command)
+	(compile (format "%s . %s"
+			 (shell-quote-argument renpy-program)
+			 arguments)))
+    (user-error "Ren'Py game directory not found")))
+
+(defun renpy-compile ()
+  "Run Ren'Py in the game directory using the \"compile\" subcommand."
+  (interactive)
+  (renpy-call-with-args "compile"))
+
+(defun renpy-lint ()
+  "Run Ren'Py in the game directory using the \"lint\" subcommand."
+  (interactive)
+  (renpy-call-with-args "lint"))
+
+(defun renpy-run ()
+  "Run Ren'Py in the game directory using the \"run\" subcommand."
+  (interactive)
+  (renpy-call-with-args "run"))
 
 ;;;; Modes.
 
