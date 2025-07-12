@@ -35,6 +35,7 @@
 
 ;;; Code:
 
+(require 'compile)
 (require 'imenu)
 (require 'subr-x)
 
