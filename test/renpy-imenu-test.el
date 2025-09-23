@@ -7,7 +7,7 @@
 ;;; Code:
 
 (require 'ert)
-(require 'renpy)
+(require 'renpy-mode)
 
 ;; TODO: Figure out proper imenu names.
 

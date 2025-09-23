@@ -4,11 +4,11 @@ A major mode for editing Ren'Py files.
 
 ** Installation
 
-Either install the ~renpy~ package from within Emacs directly from MELPA or:
+Either install the ~renpy-mode~ package from within Emacs directly from MELPA or:
 
 - Download/clone this repo to your desired location.
 
-- In Emacs, use the ~package-install-file~ command and point it to the renpy.el
+- In Emacs, use the ~package-install-file~ command and point it to the renpy-mode.el
   file location.
 
 ** Features
@@ -34,7 +34,7 @@ Either install the ~renpy~ package from within Emacs directly from MELPA or:
 Example configuration with the ~use-package~ macro:
 
 #+begin_src emacs-lisp
-  (use-package renpy
+  (use-package renpy-mode
     ;; Install the package unless installed already.
     :ensure t
     ;; Uncomment and tweak if renpy-mode was downloaded into a custom.

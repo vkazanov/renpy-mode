@@ -7,7 +7,7 @@
 ;;; Code:
 
 (require 'ert)
-(require 'renpy)
+(require 'renpy-mode)
 
 (renpy-test-bounds test-renpy-find-symbol-bounds
   "   test_symbol   "
