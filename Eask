@@ -1,13 +1,13 @@
 ;; -*- mode: eask; lexical-binding: t -*-
 
-(package "renpy"
+(package "renpy-mode"
          "0.3"
          "Major mode for editing Ren'Py files")
 
 (website-url "https://github.com/Reagankm/renpy-mode")
 (keywords "languages")
 
-(package-file "renpy.el")
+(package-file "renpy-mode.el")
 
 (script "test" "echo \"Error: no test specified\" && exit 1")
 

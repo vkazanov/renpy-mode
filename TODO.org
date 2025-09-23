@@ -159,8 +159,8 @@ Key VSCode plugin implementation points:
 
 * Publishing
 
-- [ ] rename to renpy-mode (also in Melpa)
+- [X] rename to renpy-mode
 
-- [ ] update the README
+- [X] update README.org
 
 - [ ] reannounce the package (once enough features are ready)

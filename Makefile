@@ -4,7 +4,7 @@
 EMACS = emacs
 RM = rm -f
 
-compile: renpy.elc
+compile: renpy-mode.elc
 
 .el.elc:
 	$(EMACS) --batch --quick \
@@ -12,4 +12,4 @@ compile: renpy.elc
 	    --funcall batch-byte-compile $<
 
 clean:
-	$(RM) renpy.elc
+	$(RM) renpy-mode.elc

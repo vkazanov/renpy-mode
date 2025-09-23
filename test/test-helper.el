@@ -9,7 +9,7 @@
 ;;; Code:
 
 (require 'ert)
-(require 'renpy)
+(require 'renpy-mode)
 
 (defmacro with-temp-buffer-str (str &rest body)
   "Eval BODY within a buffer with containing STR."
