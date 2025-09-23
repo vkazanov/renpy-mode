@@ -82,6 +82,14 @@ Once configured, try within a ~renpy-mode~ buffer:
 
 - ~M-.~ jump to label / screen / transform definitions.
 
+** Launcher integration
+
+The package comes with the ~emacs.edit.py~ script that configures Ren'py
+integration with Emacs. Having the RENPY_EDIT_PY environment variable set to the
+path of the file would force Ren'py launcher to use Emacs as a default editor.
+
+See https://www.renpy.org/doc/html/editor.html for details.
+
 ** History
 
 The mode is based on Leo Liu's fork of the original Emacs's Python mode

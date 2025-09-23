@@ -131,9 +131,20 @@ Key VSCode plugin implementation points:
 
 - [X] flymake + renpy lint
 
-- [ ] Ren'py launcher integration (see https://github.com/elizagamedev/renpy-mode)
+- [ ] Run the renpy launcher
 
-  - [ ] Suggest for inclusion to Ren'py itself
+- [-] Ren'py launcher integration (see https://github.com/elizagamedev/renpy-mode)
+
+  - [X] Import
+
+  - [ ] Suggest for inclusion to Ren'py itself?
+
+- [ ] Warp to line
+
+  - see https://github.com/furudean/vscode-renpy-warp
+
+  - very important to document limitations:
+    https://www.renpy.org/doc/html/developer_tools.html#warping-to-a-line
 
 - [ ] display images through a popup window or a tooltip
 
@@ -158,6 +169,9 @@ Key VSCode plugin implementation points:
 - [ ] document linting, emacs version support, dev process
 
 * Publishing
+:PROPERTIES:
+:ID:       f6ba93a9-e0d9-4fa9-9a82-1a7f59f14dc2
+:END:
 
 - [X] rename to renpy-mode
 
