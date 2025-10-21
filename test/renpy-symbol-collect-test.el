@@ -7,7 +7,7 @@
 ;;; Code:
 
 (require 'ert)
-(require 'renpy)
+(require 'renpy-mode)
 
 (ert-deftest test-renpy-collect-labels ()
   (with-temp-buffer-str

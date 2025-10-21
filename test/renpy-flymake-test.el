@@ -8,7 +8,7 @@
 
 (require 'ert)
 (require 'flymake)
-(require 'renpy)
+(require 'renpy-mode)
 
 (ert-deftest renpy--parse-lint-buffer-test ()
   (let ((output-buffer (generate-new-buffer "*renpy-lint-output*")))

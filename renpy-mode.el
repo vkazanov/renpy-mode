@@ -1,4 +1,4 @@
-;;; renpy.el --- Major mode for editing Ren'Py files -*- lexical-binding: t; -*-
+;;; renpy-mode.el --- Major mode for editing Ren'Py files -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2003-2013
 ;;   Free Software Foundation, Inc.
@@ -2387,6 +2387,6 @@ effect outside them.
 (custom-add-option 'renpy-mode-hook 'imenu-add-menubar-index)
 (custom-add-option 'renpy-mode-hook 'abbrev-mode)
 
-(provide 'renpy)
+(provide 'renpy-mode)
 
-;;; renpy.el ends here
+;;; renpy-mode.el ends here

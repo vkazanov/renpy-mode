@@ -7,7 +7,7 @@
 ;;; Code:
 
 (require 'ert)
-(require 'renpy)
+(require 'renpy-mode)
 
 ;; NOTE: ert-font-lock was only introduced in Emacs 30.
 (when (>= emacs-major-version 30)
